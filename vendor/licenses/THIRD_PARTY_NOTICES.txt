@@ -1,0 +1,386 @@
+知意输入法 (Zhiyi IME) Third-Party Notices
+=========================================
+
+This file records the third-party software and data distributed with
+知意输入法 (Zhiyi IME). The corresponding source notices are also retained beside
+each vendored dependency under third_party/.
+
+
+CxxIME
+------
+
+Upstream: https://github.com/deanxyuan/cxx-ime
+Base version: v0.6.2 (commit afd39b0)
+License: Apache License 2.0
+
+Copyright (c) 2026 CxxIME Contributors
+
+知意输入法 is a modified version of CxxIME; see NOTICE for the changes. The files
+taken from CxxIME keep their Apache License 2.0 notices; the license text is in
+data/licenses/Apache-2.0.txt (licenses/Apache-2.0.txt in binary packages). 知意输入法
+as a whole is distributed under GPL-3.0-only (LICENSE).
+
+
+darts-clone v0.32h
+------------------
+
+Upstream: https://github.com/s-yata/darts-clone
+Vendored commit: 87b71afd6cf784953e3c08f24c64203397f3b724
+License: BSD 2-Clause
+
+Copyright (c) 2008-2014, Susumu Yata
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+JSON for Modern C++ 3.11.3
+--------------------------
+
+Upstream: https://github.com/nlohmann/json
+License: MIT
+
+Copyright (c) 2013-2022 Niels Lohmann
+
+The vendored single-header distribution also contains Hedley:
+Copyright (c) 2016-2021 Evan Nemerson
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+SQLite 3.45.0
+-------------
+
+Upstream: https://www.sqlite.org/
+Source ID: 2024-01-15 17:01:13
+1066602b2b1976fe58b5150777cced894af17c803e068f5918390d6915b46e1d
+
+SQLite's authors have dedicated the deliverable SQLite source code and
+documentation to the public domain. The authoritative statement is available
+at https://www.sqlite.org/copyright.html.
+
+
+miniz 3.1.2
+-----------
+
+Upstream: https://github.com/richgel999/miniz
+Vendored commit: 77d0dce8627735138c51770d1799a1ef48f2117d
+License: MIT
+
+Copyright 2013-2014 RAD Game Tools and Valve Software
+Copyright 2010-2014 Rich Geldreich and Tenacious Software LLC
+
+The complete license text is distributed in licenses/miniz-MIT.txt and beside
+the vendored source in third_party/miniz/LICENSE.
+
+
+rime-ice dictionary data
+------------------------
+
+Upstream: https://github.com/iDvel/rime-ice
+License: GNU General Public License v3.0 only (GPL-3.0-only)
+
+The Pinyin dictionary data distributed with 知意输入法 is derived from the
+rime-ice Chinese dictionaries and transformed into CxxIME's SQLite and runtime
+binary formats. The English word list (data/english.words.tsv) is derived from
+the rime-ice English dictionaries (en_dicts/en.dict.yaml and en_ext.dict.yaml)
+by data/tools/build_english_dictionary.py, which ranks the words with wordfreq. The complete license text is distributed in
+licenses/rime-ice-GPL-3.0.txt. The corresponding dictionary source and
+transformation scripts are available in the source distribution under data/
+and data/tools/ (originally https://github.com/deanxyuan/cxx-ime).
+
+
+rime-wubi86-jidian 4.3 dictionary data
+---------------------------------------
+
+Upstream: https://github.com/KyleBing/rime-wubi86-jidian
+License: Apache License 2.0
+
+The Wubi dictionary and symbol categories distributed with 知意输入法 are derived
+from this project. The Apache License 2.0 text is included in
+data/licenses/Apache-2.0.txt in source distributions and licenses/Apache-2.0.txt
+in binary packages.
+
+
+U mode character data (data/uv_chars.tsv)
+-----------------------------------------
+
+data/uv_chars.tsv, the characters of U mode (docs/uv-mode.md), is generated by
+data/tools/build_uv_data.py from the sources below (pinned by commit and SHA-256
+in the tool) and the character frequencies of the pinyin dictionary.
+
+Stroke codes: rime-stroke (五筆畫)
+Upstream: https://github.com/rime/rime-stroke
+Commit: 1e8fff9b9494ddec23b0cbc526bcfd8171a6fd48
+License: GNU Lesser General Public License v3.0
+The license text is in data/licenses/LGPL-3.0.txt (licenses/LGPL-3.0.txt in
+binary packages); it supplements the GPL-3.0 text in rime-ice-GPL-3.0.txt.
+
+Character splits: 漢語拆字字典 (chaizi-jt.txt) by 開放詞典網 (kaifangcidian.com)
+Upstream: https://github.com/kfcd/chaizi
+Commit: e177ab54ce4edf255315a60593ffecbd8167e96b
+License: Creative Commons Attribution 3.0
+https://creativecommons.org/licenses/by/3.0/ ; the upstream notice is in
+data/licenses/chaizi-CC-BY-3.0.txt. The splits are kept as published; components
+that are not characters of their own get readings (氵 shui) added by the tool.
+
+Readings: pinyin-data
+Upstream: https://github.com/mozillazg/pinyin-data
+Commit: 9d05c9e29cb6a7e5c79f2f5279f5c1014246a19a
+License: MIT, Copyright (c) 2016 mozillazg; the license text is in
+data/licenses/pinyin-data-MIT.txt.
+
+
+Unicode 17.0 classification data and CLDR 48 emoji annotations
+---------------------------------------------------------------
+
+Upstream: https://www.unicode.org/Public/17.0.0/
+Upstream: https://github.com/unicode-org/cldr-json (48.0.0)
+License: Unicode-3.0
+
+Unmodified upstream inputs are included in data/unicode/17.0/ for offline
+regeneration; see data/unicode/README.md for their official download URLs.
+data/tools/dict_builder/emoji_classification.json is derived from emoji-test.txt,
+emoji-data.txt and UnicodeData.txt. Source URLs and SHA-256 values are recorded
+in the generated file. The independent data/symbol_catalog.json uses selected
+Unicode codepoints and ranges. Its dictionary-derived contents retain the
+rime-wubi86-jidian attribution above.
+The classification data is used offline; shared/src/symbol_ranges.inc derives
+compact property ranges for personal vocabulary and learning admission.
+The emoji category (/bq) of data/symbols.json lists emoji from emoji-test.txt.
+Its emoji_words, the emoji offered after Chinese words, are derived from the
+unmodified CLDR Chinese annotations in data/unicode/cldr48/annotations.zh.json.
+
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2026 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+
+SPDX-License-Identifier: Unicode-3.0
+
+
+wordfreq word frequency data
+----------------------------
+
+Upstream: https://github.com/rspeer/wordfreq
+License: data CC BY-SA 4.0 (code Apache License 2.0)
+
+The frequency scores in data/english.words.tsv (100 x Zipf frequency) were
+computed with wordfreq at build time. wordfreq's data is derived from Wikipedia,
+subtitles, news, books, web text and other sources; see the wordfreq README for
+the full attribution. https://creativecommons.org/licenses/by-sa/4.0/
+
+
+Laya decision model
+-------------------
+
+Upstream: https://huggingface.co/convaiinnovations/laya
+License: Apache License 2.0
+
+The trained weights in models/laya/ and of every model below are 知意输入法's own work and
+are licensed under the Apache License, Version 2.0 (data/licenses/Apache-2.0.txt) since
+2026-10-20 (GPL-3.0-only before). The upstream parts below keep their licenses.
+
+The model in models/laya/ (laya.int8g.onnx, laya.one.fused.int8g.onnx, laya_decoder.int8.onnx,
+laya_decoder_memory.int8.onnx, laya_decoder_step.int8.onnx, tokenizer.json,
+unified_vocab.json, rl_agent_config.json)
+has the Laya decision-model architecture on the mmBERT-small encoder. It was
+distilled from the multilingual Laya checkpoint fine-tuned with LoRA on Chinese
+pinyin and English completion data, exported to ONNX and quantized to int8.
+
+mmBERT-small: https://huggingface.co/jhu-clsp/mmBERT-small (Marone et al., 2025,
+Johns Hopkins University CLSP), MIT License; the tokenizer is mmBERT's.
+
+Part of the distillation text was drawn from:
+- LCCC (Wang et al., 2020), https://github.com/thu-coai/CDial-GPT, MIT License;
+- the Chinese portion of C4 (Raffel et al., 2020), https://huggingface.co/datasets/allenai/c4,
+  Open Data Commons Attribution License (ODC-BY) 1.0;
+- SkyPile-150B (Wei et al., 2023, Skywork), https://huggingface.co/datasets/Skywork/SkyPile-150B,
+  Skywork Community License (about 70% of the long-pinyin composition text since 1.5.4).
+
+The model in the installer of 1.5.9-1.5.11, Zhiyi 1.4V2-Long-L18 (release model-zhen-long-l18),
+is 1.4V2 with 18 of its 22 encoder layers; its word choice was
+distilled from Qwen3.5-9B (Qwen team, Alibaba Cloud), https://huggingface.co/Qwen/Qwen3.5-9B,
+Apache License 2.0, fine-tuned with LoRA as the teacher; only the teacher's scores were used,
+none of its weights are in the models. The word-choice text also came from SODA (Kim et al., 2023),
+https://huggingface.co/datasets/allenai/soda, CC BY 4.0; Tatoeba, https://tatoeba.org,
+CC BY 2.0 FR; and the English portion of C4 (ODC-BY 1.0).
+
+Zhiyi 1.4V2-Long-L12 (release model-zhen-long-l12, the model in the installer of 1.5.12-1.5.18) is 1.4V2 with 12 of its 22 encoder layers. Its word choice was distilled from the same fine-tuned Qwen3.5-9B teacher
+and its continuation head from a second Qwen3.5-9B teacher fine-tuned with LoRA to write the typed
+characters; only the teachers' scores were used, none of their weights are in the model. Besides
+the text above, its word-choice text came from FineWeb (Penedo et al., 2024),
+https://huggingface.co/datasets/HuggingFaceFW/fineweb, and FineWeb-2 (Penedo et al., 2025),
+https://huggingface.co/datasets/HuggingFaceFW/fineweb-2, both ODC-By 1.0; its composition text
+from SkyPile-150B and LCCC.
+
+Zhiyi ML-pumpkin-1026 (release model-ml-pumpkin-1026, the model in the installer of 1.6.0-1.6.3) is
+1.4V2-Long-L12 trained further with Traditional Chinese, Japanese, Korean and Vietnamese word
+choice and Traditional Chinese and Japanese composition; Zhiyi IME uses its Simplified Chinese and
+English. Its rows were scored by the two Qwen3.5-9B teachers above, retrained with LoRA; only their
+scores were used. Besides the text above, its text came from the cmn_Hani, yue_Hani, jpn_Jpan,
+kor_Hang and vie_Latn pages of FineWeb-2 (ODC-By 1.0) and the Cantonese Wikipedia,
+https://zh-yue.wikipedia.org (Wikimedia dump of 2026-10), CC BY-SA 4.0. The candidate lists and
+readings of the new languages came from librime (BSD-3-Clause) with rime-luna-pinyin,
+rime-bopomofo, rime-cangjie, rime-quick, rime-cantonese and rime-essay, the Cangjie 3 / Quick 3
+tables of fcitx5-table-extra, libchewing, Mozc and its dictionary, pypinyin, OpenCC and SudachiPy;
+these only produced training rows and none of them is in the model.
+
+Zhiyi ML-Flash-1103 (release model-ml-flash-1103, the model in the installer since 1.6.4) is
+ML-pumpkin-1026 with 8 of its encoder layers, a prefix mask and one head for word choice and
+composition, trained further on the same rows and on rows typed without context. Its rows were
+scored by the two Qwen3.5-9B teachers above and by a 12-layer model of our own trained from them;
+only their scores were used, none of their weights are in the model. Its text, candidate lists
+and readings came from the same sources as ML-pumpkin-1026's.
+
+
+Word n-gram (ngram/zh.ngram)
+----------------------------
+
+License: LGPL-2.1-or-later (as its base); the license text is in licenses/LGPL-2.1.txt
+
+A word trigram model scored next to the word choice. Its base is the pinyin language model
+of Youmo IME, https://github.com/Sraw/youmo-ime (LGPL-2.1-or-later), which mixes libime's
+lm_sc.arpa, https://github.com/fcitx/libime (LGPL-2.1-or-later), with n-grams counted on
+web pages of FineWeb-2 (Penedo et al., 2025), https://huggingface.co/datasets/HuggingFaceFW/fineweb-2,
+ODC-By 1.0, and of Common Crawl, https://commoncrawl.org (its terms of use). 知意输入法 mixed
+in n-grams counted on CSL, the Chinese Scientific Literature dataset (Li et al., COLING 2022),
+https://github.com/ydli-ai/CSL, Apache License 2.0, and on the science and technology pages of
+SkyPile-150B (Skywork Community License), the Chinese portion of C4 (ODC-BY 1.0) and FineWeb-2
+(ODC-By 1.0), then pruned it by relative entropy to 4 million bigrams and trigrams.
+
+
+Voice input models (downloaded separately, not in the installer)
+----------------------------------------------------------------
+
+Settings > Voice input downloads these from the release tagged "voice" of
+https://github.com/dd1000001000/zhiyi_ime, unchanged, each with its license file:
+
+- SenseVoice-Small (model.int8.onnx, tokens.txt), Tongyi Speech Lab, Alibaba Group
+  (FunAudioLLM), https://github.com/FunAudioLLM/SenseVoice ; the int8 ONNX export of k2-fsa
+  sherpa-onnx, https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17 .
+  License: FunASR Model Open Source License, Version 1.1
+  https://github.com/modelscope/FunASR/blob/main/MODEL_LICENSE
+- Silero VAD v4 (silero_vad.onnx), Silero Team, https://github.com/snakers4/silero-vad .
+  License: MIT License.
+
+
+Microsoft Visual C++ Runtime
+----------------------------
+
+msvcp140.dll, msvcp140_1.dll, vcruntime140.dll and vcruntime140_1.dll are the
+Visual C++ runtime files ONNX Runtime needs, redistributed unmodified under the
+Microsoft Visual Studio license terms for distributable code.
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+
+ONNX Runtime
+------------
+
+Upstream: https://github.com/microsoft/onnxruntime
+License: MIT
+
+onnxruntime.dll and onnxruntime_providers_shared.dll are the DirectML build (NuGet package
+Microsoft.ML.OnnxRuntime.DirectML 1.24.4), redistributed unmodified.
+
+Copyright (c) Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+DirectML
+--------
+
+Upstream: https://github.com/microsoft/DirectML
+License: Microsoft Software License Terms for Microsoft DirectX Machine Learning
+(DirectML), included as licenses/DirectML.txt
+
+DirectML.dll 1.15.4 (from the NuGet package Microsoft.AI.DirectML, as shipped in the
+onnxruntime-directml package) is redistributed unmodified. ONNX Runtime uses it to run the
+Laya model on a graphics card when one is chosen in Settings.
+Copyright (c) Microsoft Corporation. All rights reserved.

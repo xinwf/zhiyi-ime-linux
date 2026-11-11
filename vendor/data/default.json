@@ -1,0 +1,112 @@
+{
+    "schema": {
+        "name": "Zhiyi IME",
+        "version": "1.0",
+        "description": "Zhiyi IME default configuration"
+    },
+    "engine": {
+        "page_size": 7,
+        "max_pinyin_length": 64,
+        "pinyin_scheme": "full_pinyin",
+        "wubi_auto_commit": true,
+        "auto_space": true,
+        "emoji_candidates": true,
+        "wubi_commit_first_on_fifth_key": true,
+        "wubi_restart_on_fifth_after_miss": true,
+        "wubi_code_hint": false,
+        "candidate_learning": true,
+        "input_style": "full",
+        "fuzzy_pinyin": true,
+        "fuzzy_groups": []
+    },
+    "style": {
+        "font_face": "Microsoft YaHei UI",
+        "font_point": 14,
+        "layout": "vertical",
+        "render_backend": "d2d",
+        "candidate_count": 7,
+        "preedit_type": "composition"
+    },
+    "layout": {
+        "min_width": 160,
+        "max_width": 0,
+        "min_height": 0,
+        "max_height": 0,
+        "margin_x": 12,
+        "margin_y": 12,
+        "spacing": 10,
+        "candidate_spacing": 11,
+        "row_spacing": 4,
+        "hilite_spacing": 4,
+        "hilite_padding_x": 5,
+        "hilite_padding_y": 2,
+        "round_corner": 4,
+        "round_corner_ex": 4,
+        "label_font_point": 0,
+        "border_width": 1,
+        "preedit_highlight_padding_x": 4,
+        "preedit_highlight_padding_y": 2,
+        "preedit_confirmed_gap": 6,
+        "preedit_boundary_gap": 1,
+        "preedit_highlight_corner": 3,
+        "preedit_highlight_border_width": 1
+    },
+    "ascii_composer": {
+        "switch_key": {
+            "Shift_L": "code",
+            "Shift_R": "code",
+            "Control_L": "noop",
+            "Control_R": "noop",
+            "Caps_Lock": "clear"
+        }
+    },
+    "shortcuts": {
+        "activate_ime": "disabled",
+        "page_up": "",
+        "page_down": "",
+        "hold_ms": 400
+    },
+    "privacy": {
+        "experience_program": false,
+        "collect_input": false
+    },
+    "update": {
+        "notify": true
+    },
+    "startup": {
+        "autostart": true
+    },
+    "learning": {
+        "chinese_target": "",
+        "english_target": "",
+        "translator_min_gpu_memory_mb": 1000,
+        "translator_pos_min_probability": 0.4,
+        "translator_pos_max_labels": 3
+    },
+    "voice": {
+        "enable": false,
+        "device": "",
+        "language": "auto",
+        "itn": true,
+        "max_seconds": 60,
+        "min_gpu_memory_mb": 1000,
+        "key_mode": "tap",
+        "auto_stop_ms": 2000
+    },
+    "theme": "moon_light",
+    "ui": {
+        "language": "auto"
+    },
+    "diagnostics": {
+        "trace_mode": "off",
+        "log_max_size": 8388608,
+        "log_max_files": 4,
+        "normal_sample_rate": 0,
+        "truncated_sample_rate": 100,
+        "slow_query_us": 30000,
+        "cache_miss_slow_us": 10000,
+        "slow_ipc_us": 2000,
+        "slow_window_us": 5000,
+        "slow_total_us": 10000
+    }
+}

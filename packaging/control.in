@@ -1,0 +1,16 @@
+Package: zhiyi-ime
+Version: @PROJECT_VERSION@
+Section: utils
+Priority: optional
+Architecture: @ZHIYI_DEB_ARCH@
+Installed-Size: @ZHIYI_INSTALLED_SIZE@
+Depends: fcitx-bin (>= 4.2.9), fcitx-modules, libc6 (>= 2.14), libstdc++6 (>= 5.2)
+Maintainer: Zhiyi IME Linux port <zhiyi-ime@localhost>
+Homepage: https://github.com/dd1000001000/zhiyi_ime
+Description: Zhiyi Pinyin input method for Fcitx 4 (Linux port)
+ Linux port of the Windows Zhiyi IME. Reuses the upstream 1.46-million-entry
+ pinyin lexicon and shuangpin schemas, with a Fcitx 4 front end.
+ .
+ Supports full pinyin, initials abbreviations, fuzzy pinyin, five shuangpin
+ schemes, sentence composition, Chinese punctuation and user dictionary
+ learning. Configuration is handled by the zhiyi-config command.

@@ -1,0 +1,39 @@
+知意输入法 (Zhiyi IME)
+Copyright (c) 2026 知意输入法 Contributors
+
+知意输入法 is free software, distributed under the GNU General Public License,
+version 3 only (GPL-3.0-only); see LICENSE.
+
+This product is a modified version of CxxIME
+(https://github.com/deanxyuan/cxx-ime), Copyright (c) 2026 CxxIME Contributors,
+licensed under the Apache License, Version 2.0 (data/licenses/Apache-2.0.txt).
+The original copyright and license notices are retained in the source files taken
+from CxxIME; files added by 知意输入法 carry a GPL-3.0-only notice.
+
+Changes made to CxxIME (2026-10):
+- Laya context reranking: a Laya decision model (fine-tuned, then distilled into
+  mmBERT-small; ONNX Runtime, CPU or DirectML) picks the
+  first candidate for pinyin homophones and English completions from the preceding text;
+  the pick is marked with a sparkle in the candidate window
+  (engine/src/laya_rerank.cc, engine/src/laya/, ui/src/sparkle.h).
+- A word n-gram next to that choice (engine/src/laya/ngram.h): Youmo IME's pinyin language
+  model (LGPL-2.1-or-later, based on libime's) with science text mixed in, in ngram/zh.ngram,
+  distributed under LGPL-2.1-or-later as its base.
+- English word list and English word mode with completion, digit selection and case
+  matching; exact English words offered in Chinese mode
+  (engine/src/english_lexicon.cc, engine/src/engine.cc).
+- Three input modes (Chinese / English words / English letters) with a configurable
+  English style shortcut (settings, server session state).
+- Removed the floating status window; the right-click menu of the taskbar input indicator
+  switches the input states (tsf/src/language_bar.cpp, shared/include/cxxime/ime_menu.h).
+- Relicensed the combined work under GPL-3.0-only.
+- The weights of the models trained by 知意输入法 (the Laya recommendation models, including
+  the one in models/laya/, and the offline translation models v2, v3 and v4) are licensed under the
+  Apache License, Version 2.0 (data/licenses/Apache-2.0.txt) since 2026-10-20 (GPL-3.0-only
+  before). The word n-gram in ngram/ keeps LGPL-2.1-or-later, as its base.
+- Renamed to 知意输入法 / Zhiyi IME with new text service and UI GUIDs, pipe, mutex,
+  window class, registry, file and data directory names, and new icons.
+- Fixed an out-of-bounds read in SpellingsIndex::load and the node count written by
+  SpellingsIndex::create_test_trie.
+
+"CxxIME" is used here only to identify the original work.

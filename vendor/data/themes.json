@@ -1,0 +1,40 @@
+{
+    "preset_color_schemes": {
+        "moon_light": {
+            "name": "浅色",
+            "author": "CxxIME",
+            "back_color": 16777215,
+            "border_color": 13418937,
+            "text_color": 2562065,
+            "candidate_text_color": 2562065,
+            "comment_text_color": 7562587,
+            "label_text_color": 2562065,
+            "hilited_text_color": 3615007,
+            "hilited_back_color": 16777215,
+            "hilited_candidate_text_color": 16777215,
+            "hilited_candidate_back_color": 2562065,
+            "preedit_active_back_color": 15066082,
+            "preedit_active_border_color": 12499640,
+            "prevpage_color": 2562065,
+            "nextpage_color": 2562065
+        },
+        "moon_dark": {
+            "name": "深色",
+            "author": "CxxIME",
+            "back_color": 2038295,
+            "border_color": 6115398,
+            "text_color": 16184563,
+            "candidate_text_color": 16184563,
+            "comment_text_color": 12695472,
+            "label_text_color": 14143691,
+            "hilited_text_color": 15460325,
+            "hilited_back_color": 2038295,
+            "hilited_candidate_text_color": 16777215,
+            "hilited_candidate_back_color": 9139300,
+            "preedit_active_back_color": 3484710,
+            "preedit_active_border_color": 4865590,
+            "prevpage_color": 14143691,
+            "nextpage_color": 14143691
+        }
+    }
+}

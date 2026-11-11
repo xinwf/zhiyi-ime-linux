@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+"""Read or write the Zhiyi IME user configuration.
+
+Examples:
+    zhiyi-config --show
+    zhiyi-config --set fuzzy 1
+    zhiyi-config --set shuangpin xiaohe
+    zhiyi-config --reset
+"""
+import argparse
+import json
+import os
+import sys
+
+DEFAULTS = {
+    "page_size": 9,
+    "chinese_punctuation": True,
+    "full_shape": False,
+    "enable_initials": True,
+    "enable_sentence": True,
+    "default_english": False,
+    "fuzzy": 0,
+    "shuangpin": "",
+}
+
+FUZZY_BITS = {
+    "z_zh": 1, "c_ch": 2, "s_sh": 4, "n_l": 8,
+    "an_ang": 16, "en_eng": 32, "in_ing": 64,
+}
+SHUANGPIN = {"", "xiaohe", "ziranma", "microsoft", "sogou", "abc"}
+
+HELP = """可选配置项：
+  page_size            候选个数 1..10（默认 9）
+  fuzzy                模糊音位掩码，或用位名相加：%s
+  shuangpin            双拼方案：%s（空=全拼）
+  chinese_punctuation  中文标点 0/1
+  full_shape           全角 0/1
+  enable_initials      简拼 0/1
+  enable_sentence      组句 0/1
+  default_english      默认英文 0/1
+""" % (", ".join(FUZZY_BITS), ", ".join(sorted(x for x in SHUANGPIN if x)))
+
+
+def config_path():
+    base = os.environ.get("XDG_CONFIG_HOME")
+    if not base:
+        base = os.path.join(os.environ.get("HOME", "."), ".config")
+    return os.path.join(base, "zhiyi", "config.json")
+
+
+def load():
+    try:
+        with open(config_path(), encoding="utf-8") as f:
+            data = json.load(f)
+        return {**DEFAULTS, **data}
+    except (OSError, ValueError):
+        return dict(DEFAULTS)
+
+
+def coerce(key, value):
+    if key not in DEFAULTS:
+        raise SystemExit("未知配置项: %s" % key)
+    if key == "page_size":
+        number = int(value)
+        if not 1 <= number <= 10:
+            raise SystemExit("page_size 必须在 1..10 之间")
+        return number
+    if key == "fuzzy":
+        if value in FUZZY_BITS:
+            return FUZZY_BITS[value]
+        return int(value, 0)
+    if key == "shuangpin":
+        if value not in SHUANGPIN:
+            raise SystemExit("未知双拼方案: %s" % value)
+        return value
+    if isinstance(DEFAULTS[key], bool):
+        return value.lower() in ("1", "true", "yes", "on")
+    return value
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="知意输入法（Linux/fcitx4）配置工具",
+        epilog=HELP, formatter_class=argparse.RawDescriptionHelpFormatter)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--show", action="store_true", help="显示当前配置")
+    group.add_argument("--set", nargs=2, metavar=("KEY", "VALUE"),
+                       help="修改一个配置项")
+    group.add_argument("--reset", action="store_true", help="恢复默认配置")
+    args = parser.parse_args()
+
+    if args.show:
+        print("配置文件: %s" % config_path())
+        for key, value in load().items():
+            print("  %-22s %s" % (key, value))
+        return 0
+
+    if args.reset:
+        data = dict(DEFAULTS)
+    else:
+        data = load()
+        data[args.set[0]] = coerce(args.set[0], args.set[1])
+
+    path = config_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+        f.write("\n")
+    print("已写入 %s" % path)
+    print("执行 fcitx -r 使配置生效。")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

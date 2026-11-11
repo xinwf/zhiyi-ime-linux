@@ -1,0 +1,32 @@
+#!/bin/sh
+# Debian post-installation for zhiyi-ime.
+set -e
+
+if [ "$1" = "configure" ]; then
+    if command -v gtk-update-icon-cache >/dev/null 2>&1 && \
+       [ -d /usr/share/icons/hicolor ]; then
+        gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    fi
+
+    cat <<'EOF'
+
+知意输入法 (fcitx4) 已安装。
+
+使输入法生效（当前用户，无需 root）：
+    fcitx -r                    # 重启正在运行的 fcitx
+  或者注销并重新登录。
+
+然后用 Ctrl+Space 打开输入法、Ctrl+Shift 切换到「知意输入法」。
+若当前默认框架不是 fcitx：
+    im-config -n fcitx && 注销重新登录
+
+配置（候选数、模糊音、双拼、中文标点、中英默认状态）：
+    zhiyi-config --show
+    zhiyi-config --set fuzzy 1
+配置文件： ~/.config/zhiyi/config.json （由 zhiyi-config 自动同步）
+
+数据目录： /usr/share/zhiyi/data，用户词库： ~/.local/share/zhiyi/user.tsv
+EOF
+fi
+
+exit 0

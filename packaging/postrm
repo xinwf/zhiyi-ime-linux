@@ -1,0 +1,18 @@
+#!/bin/sh
+# Debian post-removal for zhiyi-ime.
+set -e
+
+if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
+    if command -v gtk-update-icon-cache >/dev/null 2>&1 && \
+       [ -d /usr/share/icons/hicolor ]; then
+        gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+    fi
+    # User dictionaries and settings are deliberately kept (like most IMEs).
+    # With `apt purge`, remove them only if the user asked for it explicitly
+    # via /etc/zhiyi-ime/purge-user-data (never created automatically).
+    if [ "$1" = "purge" ] && [ -f /etc/zhiyi-ime/purge-user-data ]; then
+        rm -f /etc/zhiyi-ime/purge-user-data
+    fi
+fi
+
+exit 0
