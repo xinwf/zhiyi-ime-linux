@@ -27,6 +27,8 @@ struct Config {
     std::uint32_t fuzzy = 0;
     // "", "xiaohe", "ziranma", "microsoft", "sogou", "abc"
     std::string shuangpin;
+    // Candidate window layout: "vertical" (rows) or "horizontal" (one line)
+    std::string layout = "vertical";
 
     bool load(const std::string& path);
     bool save(const std::string& path) const;

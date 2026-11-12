@@ -20,10 +20,19 @@ if [ "$1" = "configure" ]; then
 若当前默认框架不是 fcitx：
     im-config -n fcitx && 注销重新登录
 
-配置（候选数、模糊音、双拼、中文标点、中英默认状态）：
+配置（候选数、模糊音、双拼、候选横排竖排、中文标点、中英默认状态）：
     zhiyi-config --show
     zhiyi-config --set fuzzy 1
+    zhiyi-config --set layout horizontal    # 候选横排显示，vertical 竖排
 配置文件： ~/.config/zhiyi/config.json （由 zhiyi-config 自动同步）
+
+皮肤（5 套，移植自青简输入法，已装到 /usr/share/fcitx/skin/zhiyi-qingjian*，
+与青简官方 qingjian-fcitx4 包的皮肤并存不冲突）：
+    fcitx-config-gtk3          # 外观 -> 皮肤 里选择 知意青简绿 等
+  或者直接写入 ~/.config/fcitx/config：
+    [Appearance]
+    SkinName=zhiyi-qingjian
+  改完执行 fcitx -r 生效；皮肤对 fcitx 全局生效（经典候选窗只有一套皮肤）。
 
 数据目录： /usr/share/zhiyi/data，用户词库： ~/.local/share/zhiyi/user.tsv
 EOF

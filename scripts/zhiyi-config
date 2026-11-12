@@ -21,6 +21,7 @@ DEFAULTS = {
     "default_english": False,
     "fuzzy": 0,
     "shuangpin": "",
+    "layout": "vertical",
 }
 
 FUZZY_BITS = {
@@ -28,17 +29,19 @@ FUZZY_BITS = {
     "an_ang": 16, "en_eng": 32, "in_ing": 64,
 }
 SHUANGPIN = {"", "xiaohe", "ziranma", "microsoft", "sogou", "abc"}
+LAYOUTS = ("vertical", "horizontal")
 
 HELP = """可选配置项：
   page_size            候选个数 1..10（默认 9）
   fuzzy                模糊音位掩码，或用位名相加：%s
   shuangpin            双拼方案：%s（空=全拼）
+  layout               候选窗布局：%s（默认竖排）
   chinese_punctuation  中文标点 0/1
   full_shape           全角 0/1
   enable_initials      简拼 0/1
   enable_sentence      组句 0/1
   default_english      默认英文 0/1
-""" % (", ".join(FUZZY_BITS), ", ".join(sorted(x for x in SHUANGPIN if x)))
+""" % (", ".join(FUZZY_BITS), ", ".join(sorted(x for x in SHUANGPIN if x)), "/".join(LAYOUTS))
 
 
 def config_path():
@@ -72,6 +75,10 @@ def coerce(key, value):
     if key == "shuangpin":
         if value not in SHUANGPIN:
             raise SystemExit("未知双拼方案: %s" % value)
+        return value
+    if key == "layout":
+        if value not in LAYOUTS:
+            raise SystemExit("布局只能是 vertical 或 horizontal")
         return value
     if isinstance(DEFAULTS[key], bool):
         return value.lower() in ("1", "true", "yes", "on")

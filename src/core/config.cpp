@@ -34,10 +34,12 @@ bool Config::load(const std::string& path) {
         get_if(j, "default_english", default_english);
         get_if(j, "fuzzy", fuzzy);
         get_if(j, "shuangpin", shuangpin);
+        get_if(j, "layout", layout);
     } catch (const std::exception&) {
         return false;
     }
     if (page_size < 1 || page_size > 10) page_size = 9;
+    if (layout != "horizontal") layout = "vertical";
     return true;
 }
 
@@ -51,6 +53,7 @@ bool Config::save(const std::string& path) const {
         {"default_english", default_english},
         {"fuzzy", fuzzy},
         {"shuangpin", shuangpin},
+        {"layout", layout},
     };
     std::ofstream out(path);
     if (!out) return false;

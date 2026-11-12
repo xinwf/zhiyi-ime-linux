@@ -225,7 +225,11 @@ static void* ZhiyiCreate(FcitxInstance* instance) {
         const int page_size = addon->engine.config().page_size;
         FcitxCandidateWordSetPageSize(list, page_size);
         FcitxCandidateWordSetChoose(list, "1234567890");
-        FcitxCandidateWordSetLayoutHint(list, CLH_Vertical);
+        // Horizontal/vertical candidate display follows the "layout" config
+        // key (zhiyi-config --set layout horizontal); classic-UI renders both.
+        FcitxCandidateWordSetLayoutHint(
+            list, addon->engine.config().layout == "horizontal" ? CLH_Horizontal
+                                                                : CLH_Vertical);
 
         std::size_t index = 0;
         for (const auto& candidate : addon->engine.visible_candidates()) {

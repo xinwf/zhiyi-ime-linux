@@ -384,3 +384,24 @@ DirectML.dll 1.15.4 (from the NuGet package Microsoft.AI.DirectML, as shipped in
 onnxruntime-directml package) is redistributed unmodified. ONNX Runtime uses it to run the
 Laya model on a graphics card when one is chosen in Settings.
 Copyright (c) Microsoft Corporation. All rights reserved.
+
+
+Qingjian (青简) Fcitx 4 skins
+-----------------------------
+
+Upstream: https://github.com/qingjian-team/qingjian
+Source location: apps/linux/fcitx4/skin/generate.py and its generated output
+License: GNU General Public License v3.0 or later (GPL-3.0-or-later)
+Copyright (c) 2026 青简 (Qingjian) contributors
+
+The 5 Fcitx 4 classic-ui skins distributed in data/skins/ (installed to
+/usr/share/fcitx/skin/zhiyi-qingjian*/) are ported from the Qingjian IME
+project. The palette, fcitx_skin.conf template and candidate-window artwork
+follow the upstream files field by field; the only intentional changes are
+that the tray/main-bar icons are redrawn as a "知" text glyph instead of
+Qingjian's own artwork, and the skin ids carry a "zhiyi-" prefix so they can
+coexist with the skins installed by the upstream qingjian-fcitx4 package
+(which owns /usr/share/fcitx/skin/qingjian*). The generator is adapted into
+scripts/generate_skin.py, which keeps the upstream GPL-3.0-or-later license
+for that file (see its header); 知意输入法 as a whole is distributed under
+GPL-3.0-only (LICENSE).

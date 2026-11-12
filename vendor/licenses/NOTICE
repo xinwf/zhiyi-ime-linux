@@ -37,3 +37,9 @@ Changes made to CxxIME (2026-10):
   SpellingsIndex::create_test_trie.
 
 "CxxIME" is used here only to identify the original work.
+
+The Fcitx 4 candidate-window skins shipped with 知意输入法 (data/skins/, see also
+scripts/generate_skin.py) are ported from the Qingjian (青简) IME project
+(https://github.com/qingjian-team/qingjian, GPL-3.0-or-later), with the tray and
+main-bar icons redrawn as "知" text glyphs; see THIRD_PARTY_NOTICES.txt for the
+full provenance statement.

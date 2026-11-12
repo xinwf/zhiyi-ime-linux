@@ -50,11 +50,6 @@ std::string config_file_path() {
     return dir + "/zhiyi/config.json";
 }
 
-std::string dirname_of(const std::string& path) {
-    const std::size_t slash = path.rfind('/');
-    return slash == std::string::npos ? std::string{} : path.substr(0, slash);
-}
-
 std::string utf8_to_fullwidth(char ch) {
     // Full-width ASCII starts at U+FF01 for '!' (0x21).
     if (ch < 0x21 || ch > 0x7e) return std::string(1, ch);
@@ -121,8 +116,11 @@ void Engine::reset() { reset_composition(); }
 void Engine::save() {
     if (user_dir_.empty()) return;
     ensure_dir(user_dir_);
-    ensure_dir(dirname_of(config_file_path()));
-    config_.save(config_file_path());
+    // Only user learning data is persisted here. config.json is owned by
+    // zhiyi-config / manual edits: the engine never mutates the in-memory
+    // config, so writing it back would clobber changes made between fcitx
+    // start and exit (e.g. "zhiyi-config --set ... && fcitx -r", whose exit
+    // hook fires before the new instance loads the file).
     std::ofstream out(join_path(user_dir_, "user.tsv"), std::ios::trunc);
     if (!out) return;
     for (const auto& item : user_freq_) {

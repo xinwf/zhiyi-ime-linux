@@ -50,7 +50,7 @@ data/                   —— 构建期从上游词库生成的二进制词典
 - 候选翻页、数字 / 空格选词、回车上屏原始编码、退格、Esc 清空
 - 中文标点、全角、轻按 Shift 切换中英文
 - 用户词频自学习（`$XDG_DATA_HOME/zhiyi/user.tsv`）
-- 候选数、中文标点、模糊音、双拼等可配置
+- 候选数、候选窗横排/竖排、中文标点、模糊音、双拼等可配置
 
 未移植（Windows 版特有或依赖未公开组件）：Laya 上文推荐模型、离线翻译、
 语音输入、任务栏菜单、自动更新、备份迁移 GUI、IMM 兼容层。
@@ -106,6 +106,7 @@ fcitx -r                    # 重启当前会话的 fcitx；或注销重新登�
 | `/usr/share/fcitx/addon/fcitx-zhiyi.conf` | 插件描述 |
 | `/usr/share/fcitx/inputmethod/zhiyi.conf` | 输入法注册 |
 | `/usr/share/zhiyi/data/` | 词典、音节表、双拼方案、出厂配置 |
+| `/usr/share/fcitx/skin/zhiyi-qingjian*/` | 5 套候选窗皮肤（移植自青简，见下文） |
 | `/usr/bin/zhiyi-config` | 配置工具 |
 
 用户数据遵循 XDG：配置 `~/.config/zhiyi/config.json`，
@@ -118,12 +119,50 @@ zhiyi-config --show
 zhiyi-config --set page_size 9
 zhiyi-config --set fuzzy 5            # 位掩码: z_zh=1 c_ch=2 s_sh=4 ...
 zhiyi-config --set shuangpin xiaohe   # 空字符串 = 全拼
+zhiyi-config --set layout horizontal  # 候选横排显示（默认 vertical 竖排）
 zhiyi-config --set chinese_punctuation 1
 fcitx -r
 ```
+
+配置文件只由 `zhiyi-config` 或手工编辑修改，引擎不会回写（fcitx 退出时
+只保存用户词频 `user.tsv`），所以每次改完 `fcitx -r` 总是生效。
+
+## 皮肤（移植自青简）
+
+候选窗由 fcitx 的 classic-ui 绘制，本项目把青简（qingjian）输入法为 Fcitx 4
+生成的 5 套经典皮肤收编进 deb：配色、字号、边距与其
+`crates/qingjian-render/themes/qingjian/theme.json` 默认主题逐字段一致。
+
+| 皮肤 id | 外观 |
+|---|---|
+| `zhiyi-qingjian` | 知意青简绿：淡绿底、深绿字 |
+| `zhiyi-qingjian-light` | 知意简白：白底黑字（青简浅色配色） |
+| `zhiyi-qingjian-dark` | 知意深黑：黑底白字（青简深色配色） |
+| `zhiyi-qingjian-orange` | 知意青简橙：暖橙底、深棕字 |
+| `zhiyi-qingjian-blue` | 知意青简蓝：晴蓝底、深蓝字 |
+
+切换方法：`fcitx-config-gtk3` 的「外观 → 皮肤」里选择，或者写
+`~/.config/fcitx/config`：
+
+```ini
+[Appearance]
+SkinName=zhiyi-qingjian
+```
+
+改完执行 `fcitx -r` 生效。注意 classic-ui 的皮肤对 fcitx 全局生效
+（候选窗只有一套皮肤，所有输入法共用）。皮肤 id 统一带 `zhiyi-` 前缀，
+与系统里青简官方 `qingjian-fcitx4` 包安装的 `qingjian*` 皮肤并存，
+互不覆盖；两者配色一致，选哪个外观都相同。
+
+皮肤文件由 `scripts/generate_skin.py`（改编自青简
+`apps/linux/fcitx4/skin/generate.py`，需 Pillow ≥ 8.2）生成后提交在
+`data/skins/`，构建期不需要重新生成；与青简原版的差异是托盘/主栏
+图标换成「知」字图标（原版使用青简的竹简美术资源）。
 
 ## 许可证
 
 本移植沿用上游的 **GPL-3.0-only**；词库数据来自 rime-ice（GPL-3.0-only），
 完整声明见 `vendor/licenses/`、上游 `NOTICE` 与 `THIRD_PARTY_NOTICES.txt`。
 Fcitx 4 头文件/链接桩来自系统软件源，仅用于构建，不随 deb 分发。
+皮肤部分取自 [qingjian](https://github.com/qingjian-team/qingjian)
+（GPL-3.0-or-later，见 `scripts/generate_skin.py` 文件头与第三方声明）。
