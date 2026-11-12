@@ -4,13 +4,15 @@ Section: utils
 Priority: optional
 Architecture: @ZHIYI_DEB_ARCH@
 Installed-Size: @ZHIYI_INSTALLED_SIZE@
-Depends: fcitx-bin (>= 4.2.9), fcitx-modules, libc6 (>= 2.14), libstdc++6 (>= 5.2),
+Depends: @ZHIYI_FRAMEWORK_DEPS@, libc6 (>= 2.14), libstdc++6 (>= 5.2),
  python3, python3-gi, python3-dbus, gir1.2-appindicator3-0.1
 Maintainer: Zhiyi IME Linux port <zhiyi-ime@localhost>
 Homepage: https://github.com/dd1000001000/zhiyi_ime
-Description: Zhiyi Pinyin input method for Fcitx 4 (Linux port)
+Description: Zhiyi Pinyin input method for Fcitx (Linux port)
  Linux port of the Windows Zhiyi IME. Reuses the upstream 1.46-million-entry
- pinyin lexicon and shuangpin schemas, with a Fcitx 4 front end.
+ pinyin lexicon and shuangpin schemas. Ships input method addons for both
+ Fcitx 4 and Fcitx 5; the build automatically produces the front end(s) the
+ host framework(s) support, with identical engine behavior either way.
  .
  Supports full pinyin, initials abbreviations, fuzzy pinyin, five shuangpin
  schemes, sentence composition, Chinese punctuation and user dictionary

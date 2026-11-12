@@ -8,36 +8,79 @@ if [ "$1" = "configure" ]; then
         gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
     fi
 
-    cat <<'EOF'
+    # 按安装机上实际存在/正在运行的框架给出对应指引；双框架同时装了就都说明。
+    HAVE5=no
+    HAVE4=no
+    if [ -x /usr/bin/fcitx5 ] || [ -d /usr/share/fcitx5/addon ]; then
+        HAVE5=yes
+    fi
+    if command -v fcitx >/dev/null 2>&1 || [ -d /usr/share/fcitx/addon ]; then
+        HAVE4=yes
+    fi
+    if [ "$HAVE5" = "yes" ] && pgrep -x fcitx5 >/dev/null 2>&1; then
+        RUNNING5=yes
+    else
+        RUNNING5=no
+    fi
+    if [ "$HAVE4" = "yes" ] && pgrep -x fcitx >/dev/null 2>&1; then
+        RUNNING4=yes
+    else
+        RUNNING4=no
+    fi
 
-知意输入法 (fcitx4) 已安装。
+    cat <<EOF
+
+知意输入法已安装（Fcitx4 / Fcitx5 双前端，共用同一引擎与配置）。
 
 使输入法生效（当前用户，无需 root）：
-    fcitx -r                    # 重启正在运行的 fcitx
+EOF
+    if [ "$RUNNING5" = "yes" ]; then
+        cat <<'EOF'
+    fcitx5 -r                   # 重启正在运行的 fcitx5
+EOF
+    elif [ "$HAVE5" = "yes" ]; then
+        cat <<'EOF'
+    fcitx5 -r                   # 重启 fcitx5；未运行则直接启动 fcitx5
+EOF
+    fi
+    if [ "$RUNNING4" = "yes" ]; then
+        cat <<'EOF'
+    fcitx -r                    # 重启正在运行的 fcitx4
+EOF
+    elif [ "$HAVE4" = "yes" ] && [ "$HAVE5" != "yes" ]; then
+        cat <<'EOF'
+    fcitx -r                    # 重启 fcitx4
+EOF
+    fi
+    cat <<'EOF'
   或者注销并重新登录。
 
-然后用 Ctrl+Space 打开输入法、Ctrl+Shift 切换到「知意输入法」。
+然后用 Ctrl+Space 开启输入法，Ctrl+Shift 切换到「知意输入法」。
 若当前默认框架不是 fcitx：
     im-config -n fcitx && 注销重新登录
 
-配置（候选数、模糊音、双拼、候选横排竖排、中文标点、中英默认状态）：
+Fcitx5 下轻按 Shift（全局 AltTriggerKeys）或 Ctrl+Space 可切换中英文，
+与其它 fcitx5 输入法一致；Fcitx4 下由知意自身处理轻按 Shift 切换。
+
+配置（候选数、模糊音、双拼、候选横竖排、中文标点、中英默认状态）：
     zhiyi-config --show
     zhiyi-config --set fuzzy 1
     zhiyi-config --set layout horizontal    # 候选横排显示，vertical 竖排
-配置文件： ~/.config/zhiyi/config.json （由 zhiyi-config 自动同步）
+配置文件： ~/.config/zhiyi/config.json （zhiyi-config 会自动通知运行中的
+框架热加载，立即生效）
 
-皮肤（5 套，移植自青简输入法，已装到 /usr/share/fcitx/skin/zhiyi-qingjian*，
-与青简官方 qingjian-fcitx4 包的皮肤并存不冲突）：
-    fcitx-config-gtk3          # 外观 -> 皮肤 里选择 知意青简绿 等
-  或者直接写入 ~/.config/fcitx/config：
-    [Appearance]
-    SkinName=zhiyi-qingjian
-  改完执行 fcitx -r 生效；皮肤对 fcitx 全局生效（经典候选窗只有一套皮肤）。
+皮肤（5 套，移植自青简输入法）：
+  fcitx5: /usr/share/fcitx5/themes/zhiyi-*
+    写 ~/.config/fcitx5/conf/classicui.conf 的 Theme= 或 zhiyi-tray 菜单选择
+  fcitx4: /usr/share/fcitx/skin/zhiyi-qingjian*
+    fcitx-config-gtk3 外观 -> 皮肤 里选择，或写 ~/.config/fcitx/config 的
+    [Appearance] SkinName=，改完执行 fcitx -r 生效
 
 托盘设置（推荐）：登录后自动运行 zhiyi-tray，切到知意输入法时托盘出现
-「知」图标，菜单可直接改候选数、横竖排、双拼、模糊音、皮肤等，全部立即生效：
-    zhiyi-tray --check         # 无界面检查当前状态
-    zhiyi-tray --setup         # 可选：禁用 fcitx 自带托盘与搜狗 dbusmenu 插件
+「知」图标，菜单可直接改候选数、横竖排、双拼、模糊音、皮肤等，全部立即生效；
+自动适配 fcitx4 / fcitx5：
+    zhiyi-tray --check         # 无界面检查当前框架 / 状态 / 配置 / 皮肤
+    zhiyi-tray --setup         # 可选：禁用框架自带托盘与搜狗 dbusmenu 插件
     zhiyi-tray --undo-setup    # 恢复
 
 数据目录： /usr/share/zhiyi/data，用户词库： ~/.local/share/zhiyi/user.tsv

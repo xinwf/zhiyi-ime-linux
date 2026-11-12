@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-# 知意输入法 Fcitx4 托盘：注册 AppIndicator，知意激活时显示图标，菜单直达全部设置。
-# 与青简的 qingjian-tray 同一套思路：Fcitx4 自带 notificationitem 在未激活时会画成
-# 别的输入法图标，搜狗的 hdm/hxm 会 hook 掉 dbusmenu，所以不复用它们；--setup 禁用
-# 那三个模块后重启 Fcitx4，托盘由本脚本接管。
-# 设置写入 ~/.config/zhiyi/config.json 后通过 ReloadConfig 让插件热加载，立即生效；
-# 皮肤写 ~/.config/fcitx/conf/fcitx-classic-ui.config 的 SkinType（classic-ui 全局生效）。
+# 知意输入法托盘：注册 AppIndicator，知意激活时显示图标，菜单直达全部设置。
+# 同时支持 Fcitx4 与 Fcitx5：启动时按 dbus 服务名（org.fcitx.Fcitx5 / org.fcitx.Fcitx）
+# 自动选择后端，两个框架的设置入口、皮肤目录与重启方式分别对接。
+# Fcitx4 的思路与青简的 qingjian-tray 相同：自带 notificationitem 在未激活时会画成
+# 别的输入法图标，搜狗的 hdm/hxm 会 hook 掉 dbusmenu，--setup 禁用它们后由本脚本接管。
+# 设置写入 ~/.config/zhiyi/config.json：Fcitx4 通过 ReloadConfig 热加载；Fcitx5 插件
+# 自带 inotify 监视，再补一发 ReloadAddonConfig 双保险，均立即生效。
+# 皮肤：Fcitx4 写 fcitx-classic-ui.config 的 SkinType；Fcitx5 写 classicui.conf 的
+# Theme（classic-ui 全局生效）。
 # 用法：zhiyi-tray [--setup | --undo-setup | --check]
 import json
 import logging
@@ -26,15 +29,14 @@ except ImportError:
     dbus = None
 
 HOME = Path.home()
-PROFILE = HOME / '.config/fcitx/profile'
-CLASSIC_UI = HOME / '.config/fcitx/conf/fcitx-classic-ui.config'
-ADDON_DIR = HOME / '.config/fcitx/addon'
-SYSTEM_ADDON_DIR = Path('/usr/share/fcitx/addon')
 CONFIG = HOME / '.config/zhiyi/config.json'
-SKIN_DIRS = (Path('/usr/share/fcitx/skin'), HOME / '.config/fcitx/skin')
 ICON_DIRS = (Path('/usr/share/zhiyi/icons'),
              Path(__file__).resolve().parent.parent / 'data' / 'icons')
-OVERRIDES = ('fcitx-notificationitem', 'fcitx-sogoupinyinhdm', 'fcitx-sogoupinyinhxm')
+WATCHER_NAME = 'org.kde.StatusNotifierWatcher'
+IM_NAME = 'zhiyi'
+IM_NAMES = {'zhiyi': '知意输入法', 'qingjian': '青简', 'sogoupinyin': '搜狗拼音'}
+ICON_CN = 'zhiyi-tray-cn.png'
+ICON_EN = 'zhiyi-tray-en.png'
 
 # 与 src/core/config.{h,cpp} 的字段一一对应
 DEFAULTS = {
@@ -68,15 +70,6 @@ BOOLEAN_KEYS = (
     ('default_english', '默认英文'),
 )
 
-FCITX_SERVICE = 'org.fcitx.Fcitx'
-FCITX_PATH = '/inputmethod'
-FCITX_INTERFACE = 'org.fcitx.Fcitx.InputMethod'
-WATCHER_NAME = 'org.kde.StatusNotifierWatcher'
-IM_NAME = 'zhiyi'
-IM_NAMES = {'zhiyi': '知意输入法', 'qingjian': '青简', 'sogoupinyin': '搜狗拼音'}
-ICON_CN = 'zhiyi-tray-cn.png'
-ICON_EN = 'zhiyi-tray-en.png'
-
 log = logging.getLogger('zhiyi-tray')
 
 
@@ -96,74 +89,416 @@ def run(*command):
         log.warning('command failed cmd=%s error=%s', command[0], error)
 
 
-def fcitx():
+def session_bus():
     if dbus is None:
         return None
     try:
-        bus = dbus.SessionBus()
-        return dbus.Interface(bus.get_object(FCITX_SERVICE, FCITX_PATH), FCITX_INTERFACE)
+        return dbus.SessionBus()
     except dbus.DBusException as error:
-        log.warning('fcitx dbus unavailable error=%s', error)
+        log.warning('session bus unavailable error=%s', error)
         return None
 
 
-def d_bus_call(method, *args):
-    # 每次重新 get_object：Fcitx4 重启后旧的连接名会失效
-    if dbus is None:
-        return None
-    interface = fcitx()
-    if interface is None:
-        return None
+def parse_key_values(path):
+    """极简 key=value 解析（fcitx conf 是 ini 风格但兼容宽松），保留行序与注释。"""
+    lines = []
     try:
-        return getattr(interface, method)(*args)
-    except dbus.DBusException as error:
-        log.warning('fcitx dbus call failed method=%s error=%s', method, error)
-        return None
-
-
-def profile_value(key):
-    try:
-        for line in PROFILE.read_text(encoding='utf-8', errors='replace').splitlines():
-            if line.startswith(key + '='):
-                return line.split('=', 1)[1]
+        lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
     except OSError:
         pass
-    return ''
+    return lines
 
 
-def current_im():
-    value = d_bus_call('GetCurrentIM')
-    if value:
-        return str(value)
-    return profile_value('IMName').strip()
+def strip_quotes(value):
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+        return value[1:-1]
+    return value
 
 
-def current_state():
-    value = d_bus_call('GetCurrentState')
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return -1
+class Fcitx4Backend:
+    NAME = 'fcitx4'
+    DISPLAY = 'Fcitx4'
+    SERVICE = 'org.fcitx.Fcitx'
+    PATH = '/inputmethod'
+    INTERFACE = 'org.fcitx.Fcitx.InputMethod'
+    PROFILE = HOME / '.config/fcitx/profile'
+    CLASSIC_UI = HOME / '.config/fcitx/conf/fcitx-classic-ui.config'
+    SKIN_DIRS = (Path('/usr/share/fcitx/skin'), HOME / '.config/fcitx/skin')
+    OVERRIDES = ('fcitx-notificationitem', 'fcitx-sogoupinyinhdm',
+                 'fcitx-sogoupinyinhxm')
+    SYSTEM_ADDON_DIR = Path('/usr/share/fcitx/addon')
+    ADDON_OVERRIDE_DIR = HOME / '.config/fcitx/addon'
+
+    def bus(self):
+        bus = session_bus()
+        if bus is None:
+            return None
+        try:
+            return dbus.Interface(bus.get_object(self.SERVICE, self.PATH),
+                                  self.INTERFACE)
+        except dbus.DBusException as error:
+            log.warning('fcitx dbus unavailable error=%s', error)
+            return None
+
+    def dbus_call(self, method, *args):
+        # 每次重新 get_object：Fcitx 重启后旧的连接名会失效
+        interface = self.bus()
+        if interface is None:
+            return None
+        try:
+            return getattr(interface, method)(*args)
+        except dbus.DBusException as error:
+            log.warning('fcitx dbus call failed method=%s error=%s',
+                        method, error)
+            return None
+
+    def profile_value(self, key, section=None):
+        for line in parse_key_values(self.PROFILE):
+            if line.startswith(key + '='):
+                return line.split('=', 1)[1]
+        return ''
+
+    def current_im(self):
+        value = self.dbus_call('GetCurrentIM')
+        if value:
+            return str(value)
+        return self.profile_value('IMName').strip()
+
+    def current_state(self):
+        try:
+            return int(self.dbus_call('GetCurrentState'))
+        except (TypeError, ValueError):
+            return -1
+
+    def enabled_ims(self):
+        result = []
+        for entry in self.profile_value('EnabledIMList').split(','):
+            name, _, state = entry.partition(':')
+            if state == 'True' and name and not name.startswith('fcitx-keyboard-'):
+                result.append(name)
+            if len(result) >= 10:
+                break
+        return result or [IM_NAME]
+
+    def switch_im(self, name):
+        if self.dbus_call('SetCurrentIM', name) is not None:
+            self.dbus_call('ActivateIM')
+        else:
+            run('fcitx-remote', '-o')
+            run('fcitx-remote', '-s', name)
+        log.info('switch im requested name=%s', name)
+
+    def toggle(self):
+        if self.dbus_call('ToggleIM') is None:
+            run('fcitx-remote', '-t')
+
+    def restart(self):
+        if self.dbus_call('Restart') is None:
+            run('fcitx', '-r')
+
+    def reload_config(self):
+        # ReloadConfig 会触发插件的 ReloadConfig 钩子，引擎热加载配置，立即生效
+        if self.dbus_call('ReloadConfig') is None:
+            run('fcitx-remote', '-r')
+
+    def skin_label(self, skin_id):
+        for directory in self.SKIN_DIRS:
+            conf = directory / skin_id / 'fcitx_skin.conf'
+            for line in parse_key_values(conf):
+                if line.startswith('Name='):
+                    return line.split('=', 1)[1].strip() or skin_id
+        return skin_id
+
+    def available_skins(self):
+        ids = []
+        for directory in self.SKIN_DIRS:
+            try:
+                ids.extend(entry.name for entry in directory.iterdir()
+                           if (entry / 'fcitx_skin.conf').is_file())
+            except OSError:
+                continue
+        return self._sorted_skins(ids)
+
+    def _sorted_skins(self, ids):
+        # 去重保序（用户目录优先），皮肤不属于输入法，fcitx 自带的也一并列出；
+        # 固定排序：fcitx 内置 -> zhiyi-* -> 其余按字母序，菜单顺序稳定
+        seen, result = set(), []
+        for skin_id in sorted(set(ids),
+                              key=lambda s: (0 if s in ('default', 'dark',
+                                                        'classic', 'default-dark')
+                                             else 1 if s.startswith('zhiyi-')
+                                             else 2, s)):
+            if skin_id not in seen:
+                seen.add(skin_id)
+                result.append(skin_id)
+        return result
+
+    def current_skin(self):
+        for line in parse_key_values(self.CLASSIC_UI):
+            match = re.match(r'^#?SkinType=(\S+)', line)
+            if match:
+                return match.group(1)
+        return 'default'
+
+    def set_skin(self, skin_id):
+        if skin_id not in self.available_skins():
+            return
+        lines = parse_key_values(self.CLASSIC_UI)
+        replaced = False
+        output = []
+        for line in lines:
+            if re.match(r'^#?SkinType=', line):
+                output.append('SkinType=' + skin_id)
+                replaced = True
+            else:
+                output.append(line)
+        if not replaced:
+            output.append('SkinType=' + skin_id)
+        self.CLASSIC_UI.parent.mkdir(parents=True, exist_ok=True)
+        self.CLASSIC_UI.write_text('\n'.join(output) + '\n', encoding='utf-8')
+        self.reload_config()
+        log.info('skin changed skin=%s', skin_id)
+
+    def setup_overrides(self):
+        self.ADDON_OVERRIDE_DIR.mkdir(parents=True, exist_ok=True)
+        for name in self.OVERRIDES:
+            source = self.SYSTEM_ADDON_DIR / (name + '.conf')
+            if not source.is_file():
+                log.warning('addon description missing name=%s', name)
+                continue
+            content = re.sub(r'(?m)^Enabled=True$', 'Enabled=False',
+                             source.read_text(encoding='utf-8',
+                                              errors='replace'))
+            (self.ADDON_OVERRIDE_DIR / (name + '.conf')).write_text(
+                content, encoding='utf-8')
+            log.info('addon disabled name=%s', name)
+        self.restart()
+        print('已写入用户级配置并重启 Fcitx4，托盘由知意接管。')
+
+    def undo_overrides(self):
+        for name in self.OVERRIDES:
+            (self.ADDON_OVERRIDE_DIR / (name + '.conf')).unlink(missing_ok=True)
+        self.restart()
+        print('已删除用户级配置并重启 Fcitx4，恢复 Fcitx4 自带托盘。')
+
+    def deps_report(self):
+        return {'dbus': self.bus() is not None}
 
 
-def enabled_ims():
-    result = []
-    for entry in profile_value('EnabledIMList').split(','):
-        name, _, state = entry.partition(':')
-        if state == 'True' and name and not name.startswith('fcitx-keyboard-'):
-            result.append(name)
-        if len(result) >= 10:
-            break
-    return result or [IM_NAME]
+class Fcitx5Backend:
+    NAME = 'fcitx5'
+    DISPLAY = 'Fcitx5'
+    SERVICE = 'org.fcitx.Fcitx5'
+    PATH = '/controller'
+    INTERFACE = 'org.fcitx.Fcitx.Controller1'
+    PROFILE = HOME / '.config/fcitx5/profile'
+    CLASSIC_UI = HOME / '.config/fcitx5/conf/classicui.conf'
+    SKIN_DIRS = (Path('/usr/share/fcitx5/themes'),
+                 HOME / '.local/share/fcitx5/themes')
+    # fcitx5 的插件禁用方式：把系统描述复制到用户 PkgData addon/ 目录并改
+    # Enabled=False（同名文件优先，完整覆盖系统描述）
+    ADDON_OVERRIDE_DIR = HOME / '.local/share/fcitx5/addon'
+    OVERRIDES = ('notificationitem',)
+
+    def bus(self):
+        bus = session_bus()
+        if bus is None:
+            return None
+        try:
+            return dbus.Interface(bus.get_object(self.SERVICE, self.PATH),
+                                  self.INTERFACE)
+        except dbus.DBusException as error:
+            log.warning('fcitx5 dbus unavailable error=%s', error)
+            return None
+
+    def dbus_call(self, method, *args):
+        interface = self.bus()
+        if interface is None:
+            return None
+        try:
+            return getattr(interface, method)(*args)
+        except dbus.DBusException as error:
+            log.warning('fcitx5 dbus call failed method=%s error=%s',
+                        method, error)
+            return None
+
+    def profile_group_items(self):
+        """[Groups/0/Items/N] Name=xxx -> [名字列表]（保持顺序）。"""
+        names = []
+        in_items = False
+        for line in parse_key_values(self.PROFILE):
+            match = re.match(r'^\[Groups/0/Items/(\d+)\]', line.strip())
+            if match:
+                in_items = True
+                continue
+            if in_items and line.startswith('Name='):
+                name = line.split('=', 1)[1].strip()
+                if name:
+                    names.append(name)
+            elif in_items and line.startswith('['):
+                in_items = False
+        return names
+
+    def profile_value(self, key, section=None):
+        current = None
+        for line in parse_key_values(self.PROFILE):
+            stripped = line.strip()
+            if stripped.startswith('['):
+                current = stripped.strip('[]')
+            elif section in (None, current) and line.startswith(key + '='):
+                return line.split('=', 1)[1]
+        return ''
+
+    def current_im(self):
+        value = self.dbus_call('CurrentInputMethod')
+        if value:
+            return str(value)
+        return self.profile_value('DefaultIM', section='Groups/0').strip()
+
+    def current_state(self):
+        try:
+            return int(self.dbus_call('State'))
+        except (TypeError, ValueError):
+            return -1
+
+    def enabled_ims(self):
+        result = [name for name in self.profile_group_items()
+                  if name and not name.startswith('keyboard-')]
+        if len(result) > 10:
+            result = result[:10]
+        return result or [IM_NAME]
+
+    def switch_im(self, name):
+        if self.dbus_call('SetCurrentIM', name) is not None:
+            self.dbus_call('Activate')
+        else:
+            run('fcitx5-remote', '-s', name)
+        log.info('switch im requested name=%s', name)
+
+    def toggle(self):
+        if self.dbus_call('Toggle') is None:
+            run('fcitx5-remote', '-t')
+
+    def restart(self):
+        if self.dbus_call('Restart') is None:
+            run('fcitx5', '-r')
+
+    def reload_config(self):
+        # Fcitx5 插件自带 inotify 监视 config.json；这里补一发精确的
+        # ReloadAddonConfig 双保险，失败则退回全局重载。
+        if self.dbus_call('ReloadAddonConfig', IM_NAME) is None:
+            run('fcitx5-remote', '-r')
+
+    def _theme_name(self, directory, skin_id):
+        """读 theme.conf 的 Name（优先 zh_CN）。"""
+        conf = directory / skin_id / 'theme.conf'
+        zh_name, name = '', ''
+        for line in parse_key_values(conf):
+            if line.startswith('Name[zh_CN]='):
+                zh_name = line.split('=', 1)[1].strip()
+            elif re.match(r'^Name=', line):
+                name = line.split('=', 1)[1].strip()
+            if zh_name:
+                break
+        return zh_name or name
+
+    def skin_label(self, skin_id):
+        for directory in self.SKIN_DIRS:
+            label = self._theme_name(directory, skin_id)
+            if label:
+                return label
+        return skin_id
+
+    def available_skins(self):
+        ids = []
+        for directory in self.SKIN_DIRS:
+            try:
+                ids.extend(entry.name for entry in directory.iterdir()
+                           if (entry / 'theme.conf').is_file())
+            except OSError:
+                continue
+        return self._sorted_skins(ids)
+
+    def _sorted_skins(self, ids):
+        seen, result = set(), []
+        for skin_id in sorted(set(ids),
+                              key=lambda s: (0 if s in ('default', 'dark',
+                                                        'classic', 'default-dark')
+                                             else 1 if s.startswith('zhiyi-')
+                                             else 2, s)):
+            if skin_id not in seen:
+                seen.add(skin_id)
+                result.append(skin_id)
+        return result
+
+    def current_skin(self):
+        for line in parse_key_values(self.CLASSIC_UI):
+            match = re.match(r'^#?Theme=(\S+)', line)
+            if match:
+                return strip_quotes(match.group(1))
+        return 'default'
+
+    def set_skin(self, skin_id):
+        if skin_id not in self.available_skins():
+            return
+        lines = parse_key_values(self.CLASSIC_UI)
+        replaced = False
+        output = []
+        for line in lines:
+            if re.match(r'^#?Theme=', line):
+                output.append('Theme=' + skin_id)
+                replaced = True
+            else:
+                output.append(line)
+        if not replaced:
+            output.append('Theme=' + skin_id)
+        self.CLASSIC_UI.parent.mkdir(parents=True, exist_ok=True)
+        self.CLASSIC_UI.write_text('\n'.join(output) + '\n', encoding='utf-8')
+        # classicui 插件监视自己的 conf；再补一发 ReloadAddonConfig 即时换肤
+        self.dbus_call('ReloadAddonConfig', 'classicui')
+        log.info('skin changed skin=%s', skin_id)
+
+    def setup_overrides(self):
+        self.ADDON_OVERRIDE_DIR.mkdir(parents=True, exist_ok=True)
+        for name in self.OVERRIDES:
+            source = Path('/usr/share/fcitx5/addon') / (name + '.conf')
+            if not source.is_file():
+                log.warning('addon description missing name=%s', name)
+                continue
+            content = re.sub(r'(?m)^Enabled=True$', 'Enabled=False',
+                             source.read_text(encoding='utf-8',
+                                              errors='replace'))
+            (self.ADDON_OVERRIDE_DIR / (name + '.conf')).write_text(
+                content, encoding='utf-8')
+            log.info('addon disabled name=%s', name)
+        self.restart()
+        print('已写入用户级配置并重启 Fcitx5，托盘由知意接管。')
+
+    def undo_overrides(self):
+        for name in self.OVERRIDES:
+            (self.ADDON_OVERRIDE_DIR / (name + '.conf')).unlink(missing_ok=True)
+        self.restart()
+        print('已删除用户级配置并重启 Fcitx5，恢复 Fcitx5 自带托盘。')
+
+    def deps_report(self):
+        return {'dbus': self.bus() is not None}
 
 
-def switch_im(name):
-    if d_bus_call('SetCurrentIM', name) is not None:
-        d_bus_call('ActivateIM')
-    else:
-        run('fcitx-remote', '-o')
-        run('fcitx-remote', '-s', name)
-    log.info('switch im requested name=%s', name)
+def detect_backend():
+    """正在运行的框架优先（dbus 服务名），否则按安装痕迹猜测。"""
+    bus = session_bus()
+    if bus is not None:
+        try:
+            if bus.name_has_owner(Fcitx5Backend.SERVICE):
+                return Fcitx5Backend()
+            if bus.name_has_owner(Fcitx4Backend.SERVICE):
+                return Fcitx4Backend()
+        except dbus.DBusException:
+            pass
+    if Fcitx5Backend.PROFILE.is_file() or Path('/usr/bin/fcitx5').exists():
+        return Fcitx5Backend()
+    return Fcitx4Backend()
 
 
 def load_config():
@@ -191,99 +526,8 @@ def set_config(key, value):
     reload_config()
 
 
-def reload_config():
-    # ReloadConfig 会触发插件的 ReloadConfig 钩子，引擎热加载配置，立即生效
-    if d_bus_call('ReloadConfig') is None:
-        run('fcitx-remote', '-r')
-
-
-def skin_label(skin_id):
-    for directory in SKIN_DIRS:
-        conf = directory / skin_id / 'fcitx_skin.conf'
-        try:
-            for line in conf.read_text(encoding='utf-8', errors='replace').splitlines():
-                if line.startswith('Name='):
-                    return line.split('=', 1)[1].strip() or skin_id
-        except OSError:
-            continue
-    return skin_id
-
-
-def available_skins():
-    ids = []
-    for directory in SKIN_DIRS:
-        try:
-            ids.extend(entry.name for entry in directory.iterdir()
-                       if (entry / 'fcitx_skin.conf').is_file())
-        except OSError:
-            continue
-    # 去重保序（用户目录优先），皮肤不属于输入法，fcitx 自带的也一并列出；
-    # 固定排序：fcitx 内置 -> zhiyi-* -> 其余按字母序，菜单顺序稳定
-    seen, result = set(), []
-    for skin_id in sorted(set(ids),
-                          key=lambda s: (0 if s in ('default', 'dark', 'classic')
-                                         else 1 if s.startswith('zhiyi-') else 2, s)):
-        if skin_id not in seen:
-            seen.add(skin_id)
-            result.append(skin_id)
-    return result
-
-
-def current_skin():
-    try:
-        for line in CLASSIC_UI.read_text(encoding='utf-8', errors='replace').splitlines():
-            match = re.match(r'^#?SkinType=(\S+)', line)
-            if match:
-                return match.group(1)
-    except OSError:
-        pass
-    return 'default'
-
-
-def set_skin(skin_id):
-    if skin_id not in available_skins():
-        return
-    lines = []
-    try:
-        lines = CLASSIC_UI.read_text(encoding='utf-8', errors='replace').splitlines()
-    except OSError:
-        pass
-    replaced = False
-    output = []
-    for line in lines:
-        if re.match(r'^#?SkinType=', line):
-            output.append('SkinType=' + skin_id)
-            replaced = True
-        else:
-            output.append(line)
-    if not replaced:
-        output.append('SkinType=' + skin_id)
-    CLASSIC_UI.parent.mkdir(parents=True, exist_ok=True)
-    CLASSIC_UI.write_text('\n'.join(output) + '\n', encoding='utf-8')
-    reload_config()
-    log.info('skin changed skin=%s', skin_id)
-
-
-def setup_overrides():
-    ADDON_DIR.mkdir(parents=True, exist_ok=True)
-    for name in OVERRIDES:
-        source = SYSTEM_ADDON_DIR / (name + '.conf')
-        if not source.is_file():
-            log.warning('addon description missing name=%s', name)
-            continue
-        content = re.sub(r'(?m)^Enabled=True$', 'Enabled=False',
-                         source.read_text(encoding='utf-8', errors='replace'))
-        (ADDON_DIR / (name + '.conf')).write_text(content, encoding='utf-8')
-        log.info('addon disabled name=%s', name)
-    run('fcitx', '-r')
-    print('已写入用户级配置并重启 Fcitx4，托盘由知意接管。')
-
-
-def undo_overrides():
-    for name in OVERRIDES:
-        (ADDON_DIR / (name + '.conf')).unlink(missing_ok=True)
-    run('fcitx', '-r')
-    print('已删除用户级配置并重启 Fcitx4，恢复 Fcitx4 自带托盘。')
+def reload_config(backend):
+    backend.reload_config()
 
 
 PID_FILE = Path(os.environ.get('XDG_RUNTIME_DIR', '/tmp')) / 'zhiyi-tray.pid'
@@ -323,7 +567,8 @@ def ensure_watcher_service_file():
 
 
 class Tray:
-    def __init__(self):
+    def __init__(self, backend):
+        self.backend = backend
         self.syncing = False
         self.shown_state = None  # (im, state) -> 图标
         self.last_im = None
@@ -357,7 +602,7 @@ class Tray:
 
         # 输入法切换：与 qingjian-tray 的同名子菜单对等，托盘二选一即可
         im_menu = Gtk.Menu()
-        for name in enabled_ims():
+        for name in self.backend.enabled_ims():
             item = Gtk.MenuItem(label=IM_NAMES.get(name, name))
             item.connect('activate', self.on_switch_im, name)
             im_menu.append(item)
@@ -416,12 +661,13 @@ class Tray:
             self.menu.append(check)
             self.boolean_items.append((check, key))
 
-        # 皮肤：扫描已安装的 classic-ui 皮肤
+        # 皮肤：扫描已安装的 classic-ui 皮肤 / classicui 主题
         skin_menu = Gtk.Menu()
         first_radio = None
         self.skin_items = []
-        for skin_id in available_skins():
-            radio = Gtk.RadioMenuItem(label=skin_label(skin_id), group=first_radio)
+        for skin_id in self.backend.available_skins():
+            radio = Gtk.RadioMenuItem(label=self.backend.skin_label(skin_id),
+                                      group=first_radio)
             radio.connect('toggled', self.on_skin, skin_id)
             first_radio = first_radio or radio
             skin_menu.append(radio)
@@ -429,7 +675,7 @@ class Tray:
         self.append_submenu('皮肤', skin_menu)
 
         self.menu.append(Gtk.SeparatorMenuItem())
-        restart = Gtk.MenuItem(label='重新启动 Fcitx4')
+        restart = Gtk.MenuItem(label='重新启动 %s' % self.backend.DISPLAY)
         restart.connect('activate', self.on_restart)
         self.menu.append(restart)
         quit_item = Gtk.MenuItem(label='退出托盘')
@@ -443,15 +689,18 @@ class Tray:
         self.menu.append(root)
 
     def refresh(self):
-        state = current_state()
-        im = current_im()
+        state = self.backend.current_state()
+        im = self.backend.current_im()
         # fcitx 在未激活时会谎报当前输入法（报成列表第一个），所以只在
         # 激活状态（state==2）时更新 last_im；图标跟随最近一次使用的输入法
         # 持续显示，不会随焦点丢失闪烁消失（qingjian-tray 同款处理）
         if state == 2 and im:
             self.last_im = im
         elif self.last_im is None:
-            self.last_im = im or profile_value('IMName').strip()
+            self.last_im = im or self.backend.profile_value(
+                'IMName' if self.backend.NAME == 'fcitx4' else 'DefaultIM',
+                None if self.backend.NAME == 'fcitx4' else 'Groups/0'
+            ).strip()
         engaged = self.last_im == IM_NAME
         target = (self.last_im, state if engaged else None)
         if target != self.shown_state:
@@ -471,7 +720,7 @@ class Tray:
             return  # 图标隐藏时菜单不可达，无需刷新
         self.syncing = True
         config = load_config()
-        current = current_im()
+        current = self.backend.current_im()
         for name, item in self.im_items.items():
             item.set_label(('● ' if name == current else '　 ')
                            + IM_NAMES.get(name, name))
@@ -485,7 +734,7 @@ class Tray:
             item.set_active(bool(config['fuzzy'] & bit))
         for item, key in self.boolean_items:
             item.set_active(bool(config[key]))
-        skin = current_skin()
+        skin = self.backend.current_skin()
         for item, skin_id in self.skin_items:
             item.set_active(skin_id == skin)
         self.syncing = False
@@ -509,18 +758,16 @@ class Tray:
     def on_skin(self, item, skin_id):
         if self.syncing or not item.get_active():
             return
-        set_skin(skin_id)
+        self.backend.set_skin(skin_id)
 
     def on_toggle(self, _item):
-        if d_bus_call('ToggleIM') is None:
-            run('fcitx-remote', '-t')
+        self.backend.toggle()
 
     def on_switch_im(self, _item, name):
-        switch_im(name)
+        self.backend.switch_im(name)
 
     def on_restart(self, _item):
-        if d_bus_call('Restart') is None:
-            run('fcitx', '-r')
+        self.backend.restart()
 
     def on_quit(self, _item):
         Gtk.main_quit()
@@ -533,19 +780,24 @@ def main():
     logging.basicConfig(level=logging.INFO,
                         format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     args = sys.argv[1:]
+    backend = detect_backend()
     if args == ['--setup']:
-        setup_overrides()
+        backend.setup_overrides()
         return 0
     if args == ['--undo-setup']:
-        undo_overrides()
+        backend.undo_overrides()
         return 0
     if args == ['--check']:
         config = load_config()
-        im = current_im()
-        print('im=%s state=%s zhiyi_active=%s dbus=%s' %
-              (im, current_state(), im == IM_NAME and current_state() == 2, bool(fcitx())))
+        im = backend.current_im()
+        state = backend.current_state()
+        print('framework=%s im=%s state=%s zhiyi_active=%s dbus=%s' %
+              (backend.NAME, im, state,
+               im == IM_NAME and state == 2,
+               backend.bus() is not None))
         print('config=%s' % json.dumps(config, ensure_ascii=False, sort_keys=True))
-        print('skin=%s skins=%s' % (current_skin(), ','.join(available_skins())))
+        print('skin=%s skins=%s' % (backend.current_skin(),
+                                    ','.join(backend.available_skins())))
         print('icons=%s' % ('%s,%s' % (icon_path(ICON_CN), icon_path(ICON_EN))))
         print('gtk=%s appindicator=%s dbus_module=%s' %
               (bool(Gtk), bool(AppIndicator3), dbus is not None))
@@ -564,7 +816,7 @@ def main():
     PID_FILE.write_text(str(os.getpid()))
     import atexit
     atexit.register(lambda: PID_FILE.unlink(missing_ok=True))
-    Tray().run()
+    Tray(backend).run()
     return 0
 
 

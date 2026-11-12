@@ -14,10 +14,23 @@ mkdir -p "$DEBS" "$SYSROOT"
 
 PACKAGES=(
     fcitx-libs-dev
+    # Runtime soname libraries: without them the addon and the ABI test
+    # cannot link on machines where fcitx4 itself is not installed (the dev
+    # packages only ship unversioned linker stubs).
+    libfcitx-config4
+    libfcitx-core0
+    libfcitx-utils0
+    # Fcitx 5 SDK (used by the fcitx5 front end when the distro dev packages
+    # are not installed; harmless to fetch alongside fcitx4). The CMake
+    # package configs reference the versioned runtime libraries, so the
+    # runtime soname packages must be unpacked alongside the dev ones.
     libfcitx5core-dev
     libfcitx5utils-dev
     libfcitx5config-dev
     fcitx5-modules-dev
+    libfcitx5core7
+    libfcitx5utils2
+    libfcitx5config6
 )
 
 echo "Downloading Fcitx SDK packages into $DEBS ..."
