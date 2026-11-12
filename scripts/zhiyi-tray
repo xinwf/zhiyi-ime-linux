@@ -1,0 +1,572 @@
+#!/usr/bin/env python3
+# 知意输入法 Fcitx4 托盘：注册 AppIndicator，知意激活时显示图标，菜单直达全部设置。
+# 与青简的 qingjian-tray 同一套思路：Fcitx4 自带 notificationitem 在未激活时会画成
+# 别的输入法图标，搜狗的 hdm/hxm 会 hook 掉 dbusmenu，所以不复用它们；--setup 禁用
+# 那三个模块后重启 Fcitx4，托盘由本脚本接管。
+# 设置写入 ~/.config/zhiyi/config.json 后通过 ReloadConfig 让插件热加载，立即生效；
+# 皮肤写 ~/.config/fcitx/conf/fcitx-classic-ui.config 的 SkinType（classic-ui 全局生效）。
+# 用法：zhiyi-tray [--setup | --undo-setup | --check]
+import json
+import logging
+import os
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import gi
+
+gi.require_version('Gtk', '3.0')
+gi.require_version('AppIndicator3', '0.1')
+from gi.repository import AppIndicator3, Gio, GLib, Gtk  # noqa: E402
+
+try:
+    import dbus
+except ImportError:
+    dbus = None
+
+HOME = Path.home()
+PROFILE = HOME / '.config/fcitx/profile'
+CLASSIC_UI = HOME / '.config/fcitx/conf/fcitx-classic-ui.config'
+ADDON_DIR = HOME / '.config/fcitx/addon'
+SYSTEM_ADDON_DIR = Path('/usr/share/fcitx/addon')
+CONFIG = HOME / '.config/zhiyi/config.json'
+SKIN_DIRS = (Path('/usr/share/fcitx/skin'), HOME / '.config/fcitx/skin')
+ICON_DIRS = (Path('/usr/share/zhiyi/icons'),
+             Path(__file__).resolve().parent.parent / 'data' / 'icons')
+OVERRIDES = ('fcitx-notificationitem', 'fcitx-sogoupinyinhdm', 'fcitx-sogoupinyinhxm')
+
+# 与 src/core/config.{h,cpp} 的字段一一对应
+DEFAULTS = {
+    'page_size': 9,
+    'chinese_punctuation': True,
+    'full_shape': False,
+    'enable_initials': True,
+    'enable_sentence': True,
+    'default_english': False,
+    'fuzzy': 0,
+    'shuangpin': '',
+    'layout': 'vertical',
+}
+FUZZY_BITS = (
+    ('z_zh', 1, 'z ↔ zh'),
+    ('c_ch', 2, 'c ↔ ch'),
+    ('s_sh', 4, 's ↔ sh'),
+    ('n_l', 8, 'n ↔ l'),
+    ('an_ang', 16, 'an ↔ ang'),
+    ('en_eng', 32, 'en ↔ eng'),
+    ('in_ing', 64, 'in ↔ ing'),
+)
+SHUANGPIN = (('', '全拼'), ('xiaohe', '小鹤'), ('ziranma', '自然码'),
+             ('microsoft', '微软'), ('sogou', '搜狗'), ('abc', 'ABC'))
+LAYOUTS = (('vertical', '竖排'), ('horizontal', '横排'))
+BOOLEAN_KEYS = (
+    ('chinese_punctuation', '中文标点'),
+    ('full_shape', '全角'),
+    ('enable_initials', '简拼'),
+    ('enable_sentence', '组句'),
+    ('default_english', '默认英文'),
+)
+
+FCITX_SERVICE = 'org.fcitx.Fcitx'
+FCITX_PATH = '/inputmethod'
+FCITX_INTERFACE = 'org.fcitx.Fcitx.InputMethod'
+WATCHER_NAME = 'org.kde.StatusNotifierWatcher'
+IM_NAME = 'zhiyi'
+IM_NAMES = {'zhiyi': '知意输入法', 'qingjian': '青简', 'sogoupinyin': '搜狗拼音'}
+ICON_CN = 'zhiyi-tray-cn.png'
+ICON_EN = 'zhiyi-tray-en.png'
+
+log = logging.getLogger('zhiyi-tray')
+
+
+def icon_path(name):
+    for directory in ICON_DIRS:
+        candidate = directory / name
+        if candidate.is_file():
+            return str(candidate)
+    return name  # 图标缺失时退回主题图标名
+
+
+def run(*command):
+    try:
+        subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=5, check=False)
+    except (OSError, subprocess.SubprocessError) as error:
+        log.warning('command failed cmd=%s error=%s', command[0], error)
+
+
+def fcitx():
+    if dbus is None:
+        return None
+    try:
+        bus = dbus.SessionBus()
+        return dbus.Interface(bus.get_object(FCITX_SERVICE, FCITX_PATH), FCITX_INTERFACE)
+    except dbus.DBusException as error:
+        log.warning('fcitx dbus unavailable error=%s', error)
+        return None
+
+
+def d_bus_call(method, *args):
+    # 每次重新 get_object：Fcitx4 重启后旧的连接名会失效
+    if dbus is None:
+        return None
+    interface = fcitx()
+    if interface is None:
+        return None
+    try:
+        return getattr(interface, method)(*args)
+    except dbus.DBusException as error:
+        log.warning('fcitx dbus call failed method=%s error=%s', method, error)
+        return None
+
+
+def profile_value(key):
+    try:
+        for line in PROFILE.read_text(encoding='utf-8', errors='replace').splitlines():
+            if line.startswith(key + '='):
+                return line.split('=', 1)[1]
+    except OSError:
+        pass
+    return ''
+
+
+def current_im():
+    value = d_bus_call('GetCurrentIM')
+    if value:
+        return str(value)
+    return profile_value('IMName').strip()
+
+
+def current_state():
+    value = d_bus_call('GetCurrentState')
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return -1
+
+
+def enabled_ims():
+    result = []
+    for entry in profile_value('EnabledIMList').split(','):
+        name, _, state = entry.partition(':')
+        if state == 'True' and name and not name.startswith('fcitx-keyboard-'):
+            result.append(name)
+        if len(result) >= 10:
+            break
+    return result or [IM_NAME]
+
+
+def switch_im(name):
+    if d_bus_call('SetCurrentIM', name) is not None:
+        d_bus_call('ActivateIM')
+    else:
+        run('fcitx-remote', '-o')
+        run('fcitx-remote', '-s', name)
+    log.info('switch im requested name=%s', name)
+
+
+def load_config():
+    data = dict(DEFAULTS)
+    try:
+        data.update(json.loads(CONFIG.read_text(encoding='utf-8')))
+    except (OSError, ValueError) as error:
+        log.warning('config load failed error=%s', error)
+    return data
+
+
+def set_config(key, value):
+    """读-改-写 config.json：保留未知键，其他字段不动。"""
+    try:
+        data = json.loads(CONFIG.read_text(encoding='utf-8'))
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = dict(DEFAULTS)
+    data[key] = value
+    CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG.write_text(json.dumps(data, ensure_ascii=False, indent=4) + '\n',
+                      encoding='utf-8')
+    log.info('config changed key=%s value=%r', key, value)
+    reload_config()
+
+
+def reload_config():
+    # ReloadConfig 会触发插件的 ReloadConfig 钩子，引擎热加载配置，立即生效
+    if d_bus_call('ReloadConfig') is None:
+        run('fcitx-remote', '-r')
+
+
+def skin_label(skin_id):
+    for directory in SKIN_DIRS:
+        conf = directory / skin_id / 'fcitx_skin.conf'
+        try:
+            for line in conf.read_text(encoding='utf-8', errors='replace').splitlines():
+                if line.startswith('Name='):
+                    return line.split('=', 1)[1].strip() or skin_id
+        except OSError:
+            continue
+    return skin_id
+
+
+def available_skins():
+    ids = []
+    for directory in SKIN_DIRS:
+        try:
+            ids.extend(entry.name for entry in directory.iterdir()
+                       if (entry / 'fcitx_skin.conf').is_file())
+        except OSError:
+            continue
+    # 去重保序（用户目录优先），皮肤不属于输入法，fcitx 自带的也一并列出；
+    # 固定排序：fcitx 内置 -> zhiyi-* -> 其余按字母序，菜单顺序稳定
+    seen, result = set(), []
+    for skin_id in sorted(set(ids),
+                          key=lambda s: (0 if s in ('default', 'dark', 'classic')
+                                         else 1 if s.startswith('zhiyi-') else 2, s)):
+        if skin_id not in seen:
+            seen.add(skin_id)
+            result.append(skin_id)
+    return result
+
+
+def current_skin():
+    try:
+        for line in CLASSIC_UI.read_text(encoding='utf-8', errors='replace').splitlines():
+            match = re.match(r'^#?SkinType=(\S+)', line)
+            if match:
+                return match.group(1)
+    except OSError:
+        pass
+    return 'default'
+
+
+def set_skin(skin_id):
+    if skin_id not in available_skins():
+        return
+    lines = []
+    try:
+        lines = CLASSIC_UI.read_text(encoding='utf-8', errors='replace').splitlines()
+    except OSError:
+        pass
+    replaced = False
+    output = []
+    for line in lines:
+        if re.match(r'^#?SkinType=', line):
+            output.append('SkinType=' + skin_id)
+            replaced = True
+        else:
+            output.append(line)
+    if not replaced:
+        output.append('SkinType=' + skin_id)
+    CLASSIC_UI.parent.mkdir(parents=True, exist_ok=True)
+    CLASSIC_UI.write_text('\n'.join(output) + '\n', encoding='utf-8')
+    reload_config()
+    log.info('skin changed skin=%s', skin_id)
+
+
+def setup_overrides():
+    ADDON_DIR.mkdir(parents=True, exist_ok=True)
+    for name in OVERRIDES:
+        source = SYSTEM_ADDON_DIR / (name + '.conf')
+        if not source.is_file():
+            log.warning('addon description missing name=%s', name)
+            continue
+        content = re.sub(r'(?m)^Enabled=True$', 'Enabled=False',
+                         source.read_text(encoding='utf-8', errors='replace'))
+        (ADDON_DIR / (name + '.conf')).write_text(content, encoding='utf-8')
+        log.info('addon disabled name=%s', name)
+    run('fcitx', '-r')
+    print('已写入用户级配置并重启 Fcitx4，托盘由知意接管。')
+
+
+def undo_overrides():
+    for name in OVERRIDES:
+        (ADDON_DIR / (name + '.conf')).unlink(missing_ok=True)
+    run('fcitx', '-r')
+    print('已删除用户级配置并重启 Fcitx4，恢复 Fcitx4 自带托盘。')
+
+
+PID_FILE = Path(os.environ.get('XDG_RUNTIME_DIR', '/tmp')) / 'zhiyi-tray.pid'
+
+
+def already_running():
+    """单实例守卫：重复启动会出现多个同名托盘、菜单互相打架。"""
+    try:
+        pid = int(PID_FILE.read_text())
+        if pid != os.getpid():
+            cmdline = Path('/proc/%d/cmdline' % pid).read_bytes().decode('utf-8',
+                                                                         'replace')
+            if 'zhiyi-tray' in cmdline:
+                return pid
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def ensure_watcher_service_file():
+    """绕过 libappindicator 的注册死路：会话长时间运行后 dbus-daemon 对
+    org.kde.StatusNotifierWatcher 的激活调用会答 ServiceUnknown（明明有
+    主人），libappindicator 随即静默放弃注册，托盘图标永不出现。补一个
+    用户级 service 文件让激活调用成功，libappindicator 就会与真正的
+    watcher（gnome-shell）完成注册；健康环境下此文件不参与任何行为。
+    （本机 2026-11-13 实测：无此文件注册必败，补上后立刻成功。）"""
+    service_dir = Path.home() / '.local/share/dbus-1/services'
+    service = service_dir / 'org.kde.StatusNotifierWatcher.service'
+    content = '[D-BUS Service]\nName=org.kde.StatusNotifierWatcher\nExec=/bin/true\n'
+    try:
+        if service.read_text(encoding='utf-8') != content:
+            service_dir.mkdir(parents=True, exist_ok=True)
+            service.write_text(content, encoding='utf-8')
+            log.info('wrote %s', service)
+    except OSError as error:
+        log.warning('service file write failed error=%s', error)
+
+
+class Tray:
+    def __init__(self):
+        self.syncing = False
+        self.shown_state = None  # (im, state) -> 图标
+        self.last_im = None
+        self.im_items = {}
+        self.indicator = AppIndicator3.Indicator.new(
+            'zhiyi-tray', icon_path(ICON_CN),
+            AppIndicator3.IndicatorCategory.APPLICATION_STATUS)
+        self.indicator.set_title('知意输入法')
+        self.menu = Gtk.Menu()
+        self.build_menu()
+        self.indicator.set_menu(self.menu)
+        self.refresh()
+        GLib.timeout_add_seconds(1, self.refresh)
+        # 锁屏后 StatusNotifierWatcher 重新出现；重设状态触发注册
+        Gio.bus_watch_name(Gio.BusType.SESSION, WATCHER_NAME,
+                           Gio.BusNameWatcherFlags.NONE, self.on_watcher, None)
+
+    def on_watcher(self, _connection, _name, _owner):
+        log.info('status notifier watcher appeared')
+        # 与 qingjian-tray 相同：重设状态强制 libappindicator 重新注册，
+        # 否则启动早期的注册可能被 watcher 吞掉，图标永远不出现
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
+        self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+        self.shown_state = None
+        self.refresh()
+
+    def build_menu(self):
+        toggle = Gtk.MenuItem(label='中 / 英切换')
+        toggle.connect('activate', self.on_toggle)
+        self.menu.append(toggle)
+
+        # 输入法切换：与 qingjian-tray 的同名子菜单对等，托盘二选一即可
+        im_menu = Gtk.Menu()
+        for name in enabled_ims():
+            item = Gtk.MenuItem(label=IM_NAMES.get(name, name))
+            item.connect('activate', self.on_switch_im, name)
+            im_menu.append(item)
+            self.im_items[name] = item
+        self.append_submenu('输入法', im_menu)
+        self.menu.append(Gtk.SeparatorMenuItem())
+
+        # 候选词个数：1..10 单选
+        page_menu = Gtk.Menu()
+        first_radio = None
+        for count in range(1, 11):
+            radio = Gtk.RadioMenuItem(label='%d 个' % count, group=first_radio)
+            radio.connect('toggled', self.on_radio, 'page_size', count)
+            first_radio = first_radio or radio
+            page_menu.append(radio)
+        self.page_items = list(page_menu)
+        self.append_submenu('候选词个数', page_menu)
+
+        # 候选窗布局：竖排 / 横排
+        layout_menu = Gtk.Menu()
+        first_radio = None
+        for value, label in LAYOUTS:
+            radio = Gtk.RadioMenuItem(label=label, group=first_radio)
+            radio.connect('toggled', self.on_radio, 'layout', value)
+            first_radio = first_radio or radio
+            layout_menu.append(radio)
+        self.layout_items = list(layout_menu)
+        self.append_submenu('候选窗布局', layout_menu)
+
+        # 双拼方案
+        sp_menu = Gtk.Menu()
+        first_radio = None
+        for value, label in SHUANGPIN:
+            radio = Gtk.RadioMenuItem(label=label, group=first_radio)
+            radio.connect('toggled', self.on_radio, 'shuangpin', value)
+            first_radio = first_radio or radio
+            sp_menu.append(radio)
+        self.sp_items = list(sp_menu)
+        self.append_submenu('双拼', sp_menu)
+
+        # 模糊音：7 组复选
+        fuzzy_menu = Gtk.Menu()
+        self.fuzzy_items = []
+        for name, bit, label in FUZZY_BITS:
+            check = Gtk.CheckMenuItem(label=label)
+            check.connect('toggled', self.on_fuzzy, bit)
+            fuzzy_menu.append(check)
+            self.fuzzy_items.append((check, bit))
+        self.append_submenu('模糊音', fuzzy_menu)
+
+        # 布尔开关
+        self.boolean_items = []
+        for key, label in BOOLEAN_KEYS:
+            check = Gtk.CheckMenuItem(label=label)
+            check.connect('toggled', self.on_boolean, key)
+            self.menu.append(check)
+            self.boolean_items.append((check, key))
+
+        # 皮肤：扫描已安装的 classic-ui 皮肤
+        skin_menu = Gtk.Menu()
+        first_radio = None
+        self.skin_items = []
+        for skin_id in available_skins():
+            radio = Gtk.RadioMenuItem(label=skin_label(skin_id), group=first_radio)
+            radio.connect('toggled', self.on_skin, skin_id)
+            first_radio = first_radio or radio
+            skin_menu.append(radio)
+            self.skin_items.append((radio, skin_id))
+        self.append_submenu('皮肤', skin_menu)
+
+        self.menu.append(Gtk.SeparatorMenuItem())
+        restart = Gtk.MenuItem(label='重新启动 Fcitx4')
+        restart.connect('activate', self.on_restart)
+        self.menu.append(restart)
+        quit_item = Gtk.MenuItem(label='退出托盘')
+        quit_item.connect('activate', self.on_quit)
+        self.menu.append(quit_item)
+        self.menu.show_all()
+
+    def append_submenu(self, label, submenu):
+        root = Gtk.MenuItem(label=label)
+        root.set_submenu(submenu)
+        self.menu.append(root)
+
+    def refresh(self):
+        state = current_state()
+        im = current_im()
+        # fcitx 在未激活时会谎报当前输入法（报成列表第一个），所以只在
+        # 激活状态（state==2）时更新 last_im；图标跟随最近一次使用的输入法
+        # 持续显示，不会随焦点丢失闪烁消失（qingjian-tray 同款处理）
+        if state == 2 and im:
+            self.last_im = im
+        elif self.last_im is None:
+            self.last_im = im or profile_value('IMName').strip()
+        engaged = self.last_im == IM_NAME
+        target = (self.last_im, state if engaged else None)
+        if target != self.shown_state:
+            if engaged:
+                self.indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+                icon = icon_path(ICON_CN if state == 2 else ICON_EN)
+                self.indicator.set_icon_full(icon, '知意输入法')
+            else:
+                self.indicator.set_status(AppIndicator3.IndicatorStatus.PASSIVE)
+            self.shown_state = target
+            log.info('tray icon changed im=%s state=%s', self.last_im, state)
+        self.sync_menu(engaged)
+        return True
+
+    def sync_menu(self, active):
+        if not active:
+            return  # 图标隐藏时菜单不可达，无需刷新
+        self.syncing = True
+        config = load_config()
+        current = current_im()
+        for name, item in self.im_items.items():
+            item.set_label(('● ' if name == current else '　 ')
+                           + IM_NAMES.get(name, name))
+        for index, item in enumerate(self.page_items):
+            item.set_active(config['page_size'] == index + 1)
+        for index, (value, _label) in enumerate(LAYOUTS):
+            self.layout_items[index].set_active(config['layout'] == value)
+        for index, (value, _label) in enumerate(SHUANGPIN):
+            self.sp_items[index].set_active(config['shuangpin'] == value)
+        for item, bit in self.fuzzy_items:
+            item.set_active(bool(config['fuzzy'] & bit))
+        for item, key in self.boolean_items:
+            item.set_active(bool(config[key]))
+        skin = current_skin()
+        for item, skin_id in self.skin_items:
+            item.set_active(skin_id == skin)
+        self.syncing = False
+
+    def on_radio(self, item, key, value):
+        if self.syncing or not item.get_active():
+            return
+        set_config(key, value)
+
+    def on_fuzzy(self, item, bit):
+        if self.syncing:
+            return
+        fuzzy = load_config()['fuzzy']
+        set_config('fuzzy', fuzzy | bit if item.get_active() else fuzzy & ~bit)
+
+    def on_boolean(self, item, key):
+        if self.syncing:
+            return
+        set_config(key, bool(item.get_active()))
+
+    def on_skin(self, item, skin_id):
+        if self.syncing or not item.get_active():
+            return
+        set_skin(skin_id)
+
+    def on_toggle(self, _item):
+        if d_bus_call('ToggleIM') is None:
+            run('fcitx-remote', '-t')
+
+    def on_switch_im(self, _item, name):
+        switch_im(name)
+
+    def on_restart(self, _item):
+        if d_bus_call('Restart') is None:
+            run('fcitx', '-r')
+
+    def on_quit(self, _item):
+        Gtk.main_quit()
+
+    def run(self):
+        Gtk.main()
+
+
+def main():
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+    args = sys.argv[1:]
+    if args == ['--setup']:
+        setup_overrides()
+        return 0
+    if args == ['--undo-setup']:
+        undo_overrides()
+        return 0
+    if args == ['--check']:
+        config = load_config()
+        im = current_im()
+        print('im=%s state=%s zhiyi_active=%s dbus=%s' %
+              (im, current_state(), im == IM_NAME and current_state() == 2, bool(fcitx())))
+        print('config=%s' % json.dumps(config, ensure_ascii=False, sort_keys=True))
+        print('skin=%s skins=%s' % (current_skin(), ','.join(available_skins())))
+        print('icons=%s' % ('%s,%s' % (icon_path(ICON_CN), icon_path(ICON_EN))))
+        print('gtk=%s appindicator=%s dbus_module=%s' %
+              (bool(Gtk), bool(AppIndicator3), dbus is not None))
+        return 0
+    if args:
+        print('用法：zhiyi-tray [--setup | --undo-setup | --check]', file=sys.stderr)
+        return 2
+    if not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+        log.error('no display available')
+        return 1
+    other = already_running()
+    if other:
+        print('zhiyi-tray 已在运行（pid %d），退出本次启动。' % other, file=sys.stderr)
+        return 1
+    ensure_watcher_service_file()
+    PID_FILE.write_text(str(os.getpid()))
+    import atexit
+    atexit.register(lambda: PID_FILE.unlink(missing_ok=True))
+    Tray().run()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

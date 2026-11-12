@@ -183,7 +183,7 @@ def tray_icon(size, color):
     return text_icon(size, "知", color)
 
 
-def text_icon(size, text, color, font_size=None):
+def text_icon(size, text, color, font_size=None, stroke_width=0, stroke_fill=None):
     image = Image.new("RGBA", size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     fonts = [
@@ -206,6 +206,8 @@ def text_icon(size, text, color, font_size=None):
         text,
         font=font,
         fill=color,
+        stroke_width=stroke_width,
+        stroke_fill=stroke_fill,
     )
     return image
 
@@ -248,10 +250,45 @@ def build(skin_id, name, desc, palette, font_size=16):
     (out / "fcitx_skin.conf").write_text(SKIN_CONF.format(**values), encoding="utf-8")
 
 
+def tray_badge(size, text, fill, glyph_color, font_ratio=0.62):
+    """状态栏徽章：实心圆角底 + 居中字，整块亮色在黑面板上最醒目。"""
+    image = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle((0, 0, size[0] - 1, size[1] - 1),
+                           radius=max(4, size[0] // 5), fill=fill)
+    font = None
+    for path in [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]:
+        if Path(path).is_file():
+            try:
+                font = ImageFont.truetype(path, int(size[1] * font_ratio))
+                break
+            except OSError:
+                continue
+    if font is None:
+        font = ImageFont.load_default()
+    box = draw.textbbox((0, 0), text, font=font)
+    draw.text(((size[0] - (box[2] - box[0])) / 2 - box[0],
+               (size[1] - (box[3] - box[1])) / 2 - box[1] - size[1] * 0.03),
+              text, font=font, fill=glyph_color)
+    return image
+
+
 def main():
     for skin_id, name, desc, palette in SKINS:
         build(skin_id, name, desc, palette)
         print(skin_id, name, "->", len(list((OUT / skin_id).iterdir())), "个文件")
+    icons = OUT.parent / "icons"
+    icons.mkdir(parents=True, exist_ok=True)
+    # zhiyi-tray 的状态图标：中 = 亮绿实心徽章 + 深色「知」（黑色状态栏上
+    # 整块醒目），英文 = 暗灰绿徽章 + 浅字（空闲态）
+    tray_badge((24, 24), "知", (139, 216, 84), (24, 34, 14)).save(
+        icons / "zhiyi-tray-cn.png")
+    tray_badge((24, 24), "EN", (96, 104, 92), (222, 230, 216), font_ratio=0.48).save(
+        icons / "zhiyi-tray-en.png")
+    print("zhiyi-tray icons ->", sorted(p.name for p in icons.iterdir()))
 
 
 if __name__ == "__main__":

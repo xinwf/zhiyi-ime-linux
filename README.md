@@ -159,6 +159,46 @@ SkinName=zhiyi-qingjian
 `data/skins/`，构建期不需要重新生成；与青简原版的差异是托盘/主栏
 图标换成「知」字图标（原版使用青简的竹简美术资源）。
 
+## 托盘设置（图形界面）
+
+`zhiyi-tray` 是一个 AppIndicator 托盘小程序（登录后经
+`/etc/xdg/autostart/zhiyi-tray.desktop` 自启动）：**当输入法切换到知意时**，
+系统托盘出现「知」图标（英文子模式为灰色 `EN` 图标），菜单覆盖全部设置：
+
+```
+中 / 英切换
+输入法     ▸  知意 / 青简 / 搜狗 切换（与 qingjian-tray 对等）
+候选词个数 ▸  1..10 单选
+候选窗布局 ▸  竖排 / 横排 单选
+双拼      ▸  全拼 / 小鹤 / 自然码 / 微软 / 搜狗 / ABC 单选
+模糊音    ▸  7 组复选
+中文标点 ✓  全角 ✓  简拼 ✓  组句 ✓  默认英文 ✓
+皮肤      ▸  已安装皮肤单选（含 fcitx 自带与青简系列）
+重新启动 Fcitx4 / 退出托盘
+```
+
+点击菜单项即写 `~/.config/zhiyi/config.json` 并触发 fcitx 的
+`ReloadConfig`，插件热加载配置，**立即生效，无需 `fcitx -r`**；皮肤写
+`~/.config/fcitx/conf/fcitx-classic-ui.config` 的 `SkinType=`，classic-ui
+即时换肤。
+
+```bash
+zhiyi-tray --check        # 无界面检查：当前 IM / 状态 / 配置 / 皮肤 / 依赖
+zhiyi-tray --setup        # 禁用 fcitx 自带托盘(notificationitem)与搜狗 dbusmenu 插件
+zhiyi-tray --undo-setup   # 恢复
+```
+
+`--setup` 与青简 `qingjian-tray --setup` 的做法相同：fcitx4 的
+notificationitem 在未激活时会画错图标，搜狗的 dbusmenu 插件会抢菜单点击
+事件，托盘由 zhiyi-tray 自己注册（已在装了青简托盘的机器上验证过）。托盘
+图标只在知意激活时显示，与 qingjian-tray 并存互不影响。
+
+实现备注：启动时若发现 `~/.local/share/dbus-1/services/` 里没有
+`org.kde.StatusNotifierWatcher.service` 会自动补一个——长时间运行的会话
+里 dbus-daemon 会对该名字的激活调用错答 `ServiceUnknown`，导致
+libappindicator 静默放弃注册、图标永不出现（libappindicator 的 dbus-glib
+缺陷，2026-11-13 在 Ubuntu 20.04 实测绕过）；该文件在正常环境下无副作用。
+
 ## 许可证
 
 本移植沿用上游的 **GPL-3.0-only**；词库数据来自 rime-ice（GPL-3.0-only），

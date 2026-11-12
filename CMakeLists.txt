@@ -171,6 +171,15 @@ install(DIRECTORY "${CMAKE_SOURCE_DIR}/data/skins/"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/fcitx/skin")
 install(PROGRAMS "${CMAKE_SOURCE_DIR}/scripts/zhiyi-config"
         DESTINATION "${CMAKE_INSTALL_BINDIR}")
+# Tray settings daemon (AppIndicator): icon shows only while zhiyi is the
+# active input method; the menu exposes every config key plus skin switching.
+install(PROGRAMS "${CMAKE_SOURCE_DIR}/scripts/zhiyi-tray"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(FILES "${CMAKE_SOURCE_DIR}/data/zhiyi-tray.desktop"
+        DESTINATION "/etc/xdg/autostart")
+install(FILES "${CMAKE_SOURCE_DIR}/data/icons/zhiyi-tray-cn.png"
+              "${CMAKE_SOURCE_DIR}/data/icons/zhiyi-tray-en.png"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/zhiyi/icons")
 install(FILES "${CMAKE_SOURCE_DIR}/README.md"
         DESTINATION "${CMAKE_INSTALL_DOCDIR}")
 # GPL-3.0 project: ship the license, notices and the upstream dictionary

@@ -34,6 +34,12 @@ if [ "$1" = "configure" ]; then
     SkinName=zhiyi-qingjian
   改完执行 fcitx -r 生效；皮肤对 fcitx 全局生效（经典候选窗只有一套皮肤）。
 
+托盘设置（推荐）：登录后自动运行 zhiyi-tray，切到知意输入法时托盘出现
+「知」图标，菜单可直接改候选数、横竖排、双拼、模糊音、皮肤等，全部立即生效：
+    zhiyi-tray --check         # 无界面检查当前状态
+    zhiyi-tray --setup         # 可选：禁用 fcitx 自带托盘与搜狗 dbusmenu 插件
+    zhiyi-tray --undo-setup    # 恢复
+
 数据目录： /usr/share/zhiyi/data，用户词库： ~/.local/share/zhiyi/user.tsv
 EOF
 fi
