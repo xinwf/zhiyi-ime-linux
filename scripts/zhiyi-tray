@@ -116,6 +116,20 @@ def strip_quotes(value):
     return value
 
 
+def addon_override_content(source_text):
+    """由系统插件描述生成用户级覆盖内容。
+
+    fcitx4 的描述带有 `Enabled=True`，替换成 False 即可；fcitx5 的描述
+    （如 notificationitem.conf）往往没有 Enabled 行——fcitx5 里缺省即启用，
+    所以必须显式追加一行 `Enabled=False`，只复制原文是无效的空操作。
+    """
+    if re.search(r'(?m)^Enabled=True$', source_text):
+        return re.sub(r'(?m)^Enabled=True$', 'Enabled=False', source_text)
+    if not re.search(r'(?m)^Enabled=', source_text):
+        return source_text.rstrip('\n') + '\nEnabled=False\n'
+    return source_text
+
+
 class Fcitx4Backend:
     NAME = 'fcitx4'
     DISPLAY = 'Fcitx4'
@@ -153,6 +167,21 @@ class Fcitx4Backend:
                         method, error)
             return None
 
+    def dbus_try(self, method, *args):
+        """调用无返回值（void）的 D-Bus 方法。python-dbus 对 void 方法成功
+        时返回 None，与"总线不可达"无法从返回值区分，所以这里以异常与否
+        判定成败：成功 True（哪怕没有返回值），失败 False。"""
+        interface = self.bus()
+        if interface is None:
+            return False
+        try:
+            getattr(interface, method)(*args)
+            return True
+        except dbus.DBusException as error:
+            log.warning('fcitx dbus call failed method=%s error=%s',
+                        method, error)
+            return False
+
     def profile_value(self, key, section=None):
         for line in parse_key_values(self.PROFILE):
             if line.startswith(key + '='):
@@ -182,24 +211,24 @@ class Fcitx4Backend:
         return result or [IM_NAME]
 
     def switch_im(self, name):
-        if self.dbus_call('SetCurrentIM', name) is not None:
-            self.dbus_call('ActivateIM')
+        if self.dbus_try('SetCurrentIM', name):
+            self.dbus_try('ActivateIM')
         else:
             run('fcitx-remote', '-o')
             run('fcitx-remote', '-s', name)
         log.info('switch im requested name=%s', name)
 
     def toggle(self):
-        if self.dbus_call('ToggleIM') is None:
+        if not self.dbus_try('ToggleIM'):
             run('fcitx-remote', '-t')
 
     def restart(self):
-        if self.dbus_call('Restart') is None:
+        if not self.dbus_try('Restart'):
             run('fcitx', '-r')
 
     def reload_config(self):
         # ReloadConfig 会触发插件的 ReloadConfig 钩子，引擎热加载配置，立即生效
-        if self.dbus_call('ReloadConfig') is None:
+        if not self.dbus_try('ReloadConfig'):
             run('fcitx-remote', '-r')
 
     def skin_label(self, skin_id):
@@ -267,9 +296,8 @@ class Fcitx4Backend:
             if not source.is_file():
                 log.warning('addon description missing name=%s', name)
                 continue
-            content = re.sub(r'(?m)^Enabled=True$', 'Enabled=False',
-                             source.read_text(encoding='utf-8',
-                                              errors='replace'))
+            content = addon_override_content(
+                source.read_text(encoding='utf-8', errors='replace'))
             (self.ADDON_OVERRIDE_DIR / (name + '.conf')).write_text(
                 content, encoding='utf-8')
             log.info('addon disabled name=%s', name)
@@ -323,6 +351,21 @@ class Fcitx5Backend:
                         method, error)
             return None
 
+    def dbus_try(self, method, *args):
+        """无返回值的 Controller1 方法（Toggle/Restart/ReloadAddonConfig...
+        均为 void）：python-dbus 成功时返回 None，不能据此判定失败；
+        以异常与否区分，成功返回 True。"""
+        interface = self.bus()
+        if interface is None:
+            return False
+        try:
+            getattr(interface, method)(*args)
+            return True
+        except dbus.DBusException as error:
+            log.warning('fcitx5 dbus call failed method=%s error=%s',
+                        method, error)
+            return False
+
     def profile_group_items(self):
         """[Groups/0/Items/N] Name=xxx -> [名字列表]（保持顺序）。"""
         names = []
@@ -370,24 +413,24 @@ class Fcitx5Backend:
         return result or [IM_NAME]
 
     def switch_im(self, name):
-        if self.dbus_call('SetCurrentIM', name) is not None:
-            self.dbus_call('Activate')
+        if self.dbus_try('SetCurrentIM', name):
+            self.dbus_try('Activate')
         else:
             run('fcitx5-remote', '-s', name)
         log.info('switch im requested name=%s', name)
 
     def toggle(self):
-        if self.dbus_call('Toggle') is None:
+        if not self.dbus_try('Toggle'):
             run('fcitx5-remote', '-t')
 
     def restart(self):
-        if self.dbus_call('Restart') is None:
+        if not self.dbus_try('Restart'):
             run('fcitx5', '-r')
 
     def reload_config(self):
         # Fcitx5 插件自带 inotify 监视 config.json；这里补一发精确的
         # ReloadAddonConfig 双保险，失败则退回全局重载。
-        if self.dbus_call('ReloadAddonConfig', IM_NAME) is None:
+        if not self.dbus_try('ReloadAddonConfig', IM_NAME):
             run('fcitx5-remote', '-r')
 
     def _theme_name(self, directory, skin_id):
@@ -456,7 +499,7 @@ class Fcitx5Backend:
         self.CLASSIC_UI.parent.mkdir(parents=True, exist_ok=True)
         self.CLASSIC_UI.write_text('\n'.join(output) + '\n', encoding='utf-8')
         # classicui 插件监视自己的 conf；再补一发 ReloadAddonConfig 即时换肤
-        self.dbus_call('ReloadAddonConfig', 'classicui')
+        self.dbus_try('ReloadAddonConfig', 'classicui')
         log.info('skin changed skin=%s', skin_id)
 
     def setup_overrides(self):
@@ -466,9 +509,8 @@ class Fcitx5Backend:
             if not source.is_file():
                 log.warning('addon description missing name=%s', name)
                 continue
-            content = re.sub(r'(?m)^Enabled=True$', 'Enabled=False',
-                             source.read_text(encoding='utf-8',
-                                              errors='replace'))
+            content = addon_override_content(
+                source.read_text(encoding='utf-8', errors='replace'))
             (self.ADDON_OVERRIDE_DIR / (name + '.conf')).write_text(
                 content, encoding='utf-8')
             log.info('addon disabled name=%s', name)
@@ -795,6 +837,18 @@ def main():
               (backend.NAME, im, state,
                im == IM_NAME and state == 2,
                backend.bus() is not None))
+        if backend.NAME == 'fcitx5':
+            # 接管状态：--setup 生效时用户级覆盖文件带 Enabled=False，
+            # fcitx5 自带的 notificationitem 托盘就不会再注册
+            override = backend.ADDON_OVERRIDE_DIR / 'notificationitem.conf'
+            try:
+                disabled = 'Enabled=False' in override.read_text(
+                    encoding='utf-8', errors='replace')
+            except OSError:
+                disabled = False
+            print('fcitx5_tray_takeover: override_exists=%s disabled=%s '
+                  '(zhiyi-tray --setup 可禁用 fcitx5 自带托盘)' %
+                  (override.is_file(), disabled))
         print('config=%s' % json.dumps(config, ensure_ascii=False, sort_keys=True))
         print('skin=%s skins=%s' % (backend.current_skin(),
                                     ','.join(backend.available_skins())))

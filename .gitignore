@@ -34,3 +34,6 @@ zhiyi.syllables
 .idea/
 *.swp
 .DS_Store
+
+# ZCode session artifacts
+.zcode/

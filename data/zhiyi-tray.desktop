@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=知意输入法托盘
-Comment=知意输入法 (fcitx4) 托盘：全部设置的图形界面
+Comment=知意输入法 (fcitx4 / fcitx5) 托盘：全部设置的图形界面
 Exec=zhiyi-tray
 Icon=/usr/share/zhiyi/icons/zhiyi-tray-cn.png
 Terminal=false

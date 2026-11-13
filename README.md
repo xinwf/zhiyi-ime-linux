@@ -222,7 +222,10 @@ zhiyi-tray --undo-setup   # 恢复
 `--setup` 与青简 `qingjian-tray --setup` 的做法相同：fcitx4 的
 notificationitem 在未激活时会画错图标，搜狗的 dbusmenu 插件会抢菜单点击
 事件，托盘由 zhiyi-tray 自己注册；fcitx5 下则是禁用 `notificationitem`
-插件（用户级覆盖文件）。托盘图标只在知意激活时显示。
+插件（用户级覆盖文件，`zhiyi-tray --check` 可查看生效状态）。托盘图标只在
+知意激活时显示。注意 deb 安装后的 autostart 要**重新登录**才生效；当前
+会话可先手动运行 `zhiyi-tray &`（未运行时托盘上只有 fcitx 自带图标，
+右键它当然没有知意的皮肤菜单）。
 
 实现备注：启动时若发现 `~/.local/share/dbus-1/services/` 里没有
 `org.kde.StatusNotifierWatcher.service` 会自动补一个——长时间运行的会话
