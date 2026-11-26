@@ -49,14 +49,18 @@ jobs:
 
       - name: Install build dependencies
         run: |
+          # fcitx-libs-dev pulls in fcitx-bin, which conflicts with fcitx5.
+          # Download the Fcitx 4 SDK without installing it in the next step.
           apt-get install -y --no-install-recommends \
             -o Dpkg::Options::=--force-confdef \
             -o Dpkg::Options::=--force-confold \
             build-essential cmake dpkg-dev pkg-config python3 \
             extra-cmake-modules \
-            fcitx-libs-dev \
             libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
             fcitx5-modules-dev fcitx5
+
+      - name: Fetch SDK packages without installing them
+        run: bash scripts/fetch-sdk.sh
 
       - name: Build, test and package
         env:
