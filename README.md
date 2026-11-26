@@ -1,8 +1,8 @@
 # 知意输入法 · Linux 版（Fcitx 4 / Fcitx 5）
 
 Windows 版 [知意输入法](https://github.com/dd1000001000/zhiyi_ime) 的 Linux 移植，
-前端为 **Fcitx 4 与 Fcitx 5 双输入法插件**，最终产物是一个可直接 `dpkg -i`
-安装的 `.deb`。
+源码同时提供 **Fcitx 4 与 Fcitx 5 双输入法插件**；CI 按发行版生成对应的单前端
+`.deb`，可直接 `dpkg -i` 安装。
 
 ## 双框架自动识别
 
@@ -19,7 +19,8 @@ Windows 版 [知意输入法](https://github.com/dd1000001000/zhiyi_ime) 的 Lin
 前端自动生成 `fcitx-bin | fcitx5` 二选一）。两个前端喂给引擎的按键流完全
 一致，行为、配置、词典、用户词库完全相同；`tools/zhiyi_fcitx5_test.cpp`
 用 fcitx5 官方 testfrontend 在进程内回放按键断言提交串，与 fcitx4 的 ABI
-契约测试一并跑在 `ctest` 里。
+契约测试一并跑在 `ctest` 里。CI 通过 `ZHIYI_FRONTEND` 覆盖自动检测，确保
+每个发行版只生成目标框架的插件。
 
 ## 为什么最初是 Fcitx 4
 
@@ -97,6 +98,13 @@ bash scripts/fetch-sdk.sh     # 仅在首次构建时需要（下载 fcitx4/fcit
 bash scripts/build-deb.sh     # configure -> build -> ctest -> staging -> dpkg-deb
 ```
 
+CI 或需要单前端包时可强制选择：
+
+```bash
+ZHIYI_FRONTEND=fcitx4 bash scripts/build-deb.sh
+ZHIYI_FRONTEND=fcitx5 bash scripts/build-deb.sh
+```
+
 打包用 `cmake --install` 到 staging 目录再 `dpkg-deb -b -Zgzip -z1`：
 CPack 默认的 xz 压缩在 46 MiB 二进制词典上会耗时过久，快速 gzip 只需几秒。
 
@@ -121,15 +129,15 @@ cmake -S . -B build-fc5 -DZHIYI_ENABLE_FCITX4=OFF   # fcitx5 机器
 
 ## GitHub 自动打包与发布
 
-`.github/workflows/build-deb.yml` 在 Ubuntu 22.04 runner 上用容器矩阵同时构建
-**Ubuntu 20.04 与 22.04** 两个目标（GitHub 托管的 20.04 runner 已于 2025 年
-下线），push 到 `main`、Pull Request 或手动触发时执行 configure → build →
-ctest → dpkg-deb，并把两个 `.deb` 分别作为 Actions artifact 上传；推送 `v*`
-标签时还会自动创建 GitHub Release，把两个发行版的安装包都作为附件发布。
-CI 按发行版安装依赖：Ubuntu 20.04 只安装 Fcitx 4 开发包并构建单前端包；
-Ubuntu 22.04 安装 Fcitx 5 开发包，并通过 `scripts/fetch-sdk.sh` 只下载、解包
-Fcitx 4 SDK 来构建双前端包（设 `FETCH_FCITX5=0`）。Fcitx 4 SDK 不通过 apt
-安装到 22.04 容器，因为其依赖的 `fcitx-bin` 与 `fcitx5` 互相冲突。
+`.github/workflows/build-deb.yml` 在 Ubuntu 24.04 runner 上用容器矩阵分别构建
+**Ubuntu 20.04、22.04、24.04 与 26.04** 四个目标，push 到 `main`、Pull Request
+或手动触发时执行 configure → build → ctest → dpkg-deb，并把四个 `.deb` 分别作为
+Actions artifact 上传；推送 `v*` 标签时还会自动创建 GitHub Release，把四个发行版
+的安装包都作为附件发布。
+CI 保留双框架代码兼容，但发布包按发行版拆分：Ubuntu 20.04 通过
+`ZHIYI_FRONTEND=fcitx4` 只构建 Fcitx 4；Ubuntu 22.04、24.04、26.04 通过
+`ZHIYI_FRONTEND=fcitx5` 只构建 Fcitx 5。每个容器只安装对应框架的开发包，
+不需要同时安装 Fcitx 4/5，也不再下载另一套 SDK。
 
 发布新版本只需打标签（版本号取标签去掉前导 `v`；非标签构建取 CMakeLists.txt
 中的 `project(zhiyi-ime VERSION ...)`）：

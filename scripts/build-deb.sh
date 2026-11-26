@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Build, test and package zhiyi-ime as a .deb (no root privileges needed).
 #
-# The same source tree ships both input method front ends: CMake auto-detects
-# which frameworks (fcitx4 / fcitx5) the host provides and builds the matching
-# addons, so the produced package works on whatever the build machine offers.
+# The same source tree ships both input method front ends. Local builds auto-detect
+# which frameworks (fcitx4 / fcitx5) the host provides; CI sets ZHIYI_FRONTEND to
+# build exactly one front end for its target distro.
 #
 # Packaging is deliberately NOT done with CPack: its default xz compression
 # spends a very long time on the ~46 MiB binary dictionaries. Instead we
@@ -20,6 +20,16 @@ BUILD_DIR="${BUILD_DIR:-$ROOT/build/deb}"
 DIST_DIR="${DIST_DIR:-$ROOT/dist}"
 STAGE="$BUILD_DIR/stage"
 JOBS="${JOBS:-$(nproc)}"
+FRAMEWORK_ARGS=()
+case "${ZHIYI_FRONTEND:-auto}" in
+    auto) FRAMEWORK_ARGS=(-DZHIYI_ENABLE_FCITX4=AUTO -DZHIYI_ENABLE_FCITX5=AUTO) ;;
+    fcitx4) FRAMEWORK_ARGS=(-DZHIYI_ENABLE_FCITX4=ON -DZHIYI_ENABLE_FCITX5=OFF) ;;
+    fcitx5) FRAMEWORK_ARGS=(-DZHIYI_ENABLE_FCITX4=OFF -DZHIYI_ENABLE_FCITX5=ON) ;;
+    *)
+        echo "ERROR: ZHIYI_FRONTEND must be auto, fcitx4 or fcitx5" >&2
+        exit 2
+        ;;
+esac
 
 chmod +x "$ROOT/packaging/postinst" "$ROOT/packaging/postrm" \
          "$ROOT/scripts/zhiyi-config" "$ROOT/scripts/zhiyi-tray" \
@@ -27,7 +37,8 @@ chmod +x "$ROOT/packaging/postinst" "$ROOT/packaging/postrm" \
 
 # CI installs the distro SDK packages system-wide, so nothing to download.
 # Offline/local builds keep using fetch-sdk.sh; set FETCH_SDK=0 to opt out.
-if [ ! -f "$ROOT/.deps/sysroot/usr/include/fcitx/ime.h" ] &&
+if [ "${ZHIYI_FRONTEND:-auto}" != "fcitx5" ] &&
+   [ ! -f "$ROOT/.deps/sysroot/usr/include/fcitx/ime.h" ] &&
    [ ! -f /usr/include/fcitx/ime.h ] &&
    [ "${FETCH_SDK:-1}" = "1" ]; then
     echo "Fcitx SDK missing, fetching development packages ..."
@@ -39,7 +50,8 @@ fi
 echo "==> configure"
 cmake -S "$ROOT" -B "$BUILD_DIR" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=/usr
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    "${FRAMEWORK_ARGS[@]}"
 
 echo "==> build"
 cmake --build "$BUILD_DIR" -j"$JOBS"

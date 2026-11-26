@@ -24,7 +24,8 @@
 - **候选窗横排布局**：可用 `zhiyi-config --set layout horizontal` 或托盘菜单切换。
 - **Debian 打包与自动发布**：免 root 的 SDK 获取、`ctest` 回归测试、
   `dpkg-deb` 打包，以及 GitHub Actions 自动构建、测试并发布 Release；
-  同时产出 Ubuntu 20.04 与 22.04 两个安装包。
+  同时产出 Ubuntu 20.04、22.04、24.04 与 26.04 四个安装包；20.04 使用
+  Fcitx 4，22.04 及以上版本使用 Fcitx 5。
 
 ### 修复
 
@@ -33,6 +34,8 @@
 - 修复托盘菜单项被调用两次的问题：python-dbus 对 void 方法返回 `None`
   不再被误判为调用失败，中英切换、重启、重载配置均只执行一次。
 - 修复 Fcitx 5 托盘图标与皮肤菜单不正确的问题。
+- 修复 CI 缺少 X11 开发头文件，以及 Ubuntu 22.04 旧版 testfrontend 接口
+  导致端到端测试崩溃的问题。
 
 ### 已知限制
 

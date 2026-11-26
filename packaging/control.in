@@ -10,9 +10,8 @@ Maintainer: Zhiyi IME Linux port <zhiyi-ime@localhost>
 Homepage: https://github.com/dd1000001000/zhiyi_ime
 Description: Zhiyi Pinyin input method for Fcitx (Linux port)
  Linux port of the Windows Zhiyi IME. Reuses the upstream 1.46-million-entry
- pinyin lexicon and shuangpin schemas. Ships input method addons for both
- Fcitx 4 and Fcitx 5; the build automatically produces the front end(s) the
- host framework(s) support, with identical engine behavior either way.
+ pinyin lexicon and shuangpin schemas. Ships the input method addon for the
+ selected Fcitx front end, with the same engine behavior on Fcitx 4 and Fcitx 5.
  .
  Supports full pinyin, initials abbreviations, fuzzy pinyin, five shuangpin
  schemes, sentence composition, Chinese punctuation and user dictionary

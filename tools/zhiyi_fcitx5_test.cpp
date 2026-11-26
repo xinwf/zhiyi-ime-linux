@@ -15,8 +15,6 @@ FCITX_ADDON_DECLARE_FUNCTION(TestFrontend, createInputContext,
 FCITX_ADDON_DECLARE_FUNCTION(TestFrontend, destroyInputContext, void(ICUUID));
 FCITX_ADDON_DECLARE_FUNCTION(TestFrontend, keyEvent,
                              void(ICUUID, const Key &, bool isRelease));
-FCITX_ADDON_DECLARE_FUNCTION(TestFrontend, sendKeyEvent,
-                             bool(ICUUID, const Key &, bool isRelease));
 FCITX_ADDON_DECLARE_FUNCTION(TestFrontend, pushCommitExpectation,
                              void(std::string));
 
@@ -72,6 +70,16 @@ static void type(Instance* instance, const ICUUID& uuid,
     for (const auto& k : keys) {
         frontend->call<ITestFrontend::keyEvent>(uuid, Key(k), false);
     }
+}
+
+static bool send_key_event(InputContext* ic, const Key& key) {
+    KeyEvent event(ic, key, false);
+    // Fcitx 5.0.x returns void here; 5.1.x returns bool. KeyEvent::accepted()
+    // exists in both versions and reports whether the framework consumed it.
+    ic->keyEvent(event);
+    FCITX_INFO() << "KeyEvent key: " << key.toString()
+                 << " isRelease: 0 accepted: " << event.accepted();
+    return event.accepted();
 }
 
 static std::string first_candidate(InputContext* ic) {
@@ -234,18 +242,14 @@ static void run_tests_part2(Instance* instance, const ICUUID& uuid,
     }
     type(instance, uuid, {"n", "i"});
     CHECK(ic->inputPanel().candidateList());
-    bool consumed =
-        frontend->call<ITestFrontend::sendKeyEvent>(uuid, Key("Control+space"),
-                                                    false);
+    bool consumed = send_key_event(ic, Key("Control+space"));
     CHECK(consumed);  // the toggle hotkey is swallowed by the core
     CHECK(!ic->inputPanel().candidateList());
-    consumed = frontend->call<ITestFrontend::sendKeyEvent>(uuid, Key("n"),
-                                                           false);
+    consumed = send_key_event(ic, Key("n"));
     CHECK(!consumed);  // forwarded verbatim while deactivated
     CHECK(!ic->inputPanel().candidateList());
     frontend->call<ITestFrontend::keyEvent>(uuid, Key("Control+space"), false);
-    consumed = frontend->call<ITestFrontend::sendKeyEvent>(uuid, Key("n"),
-                                                           false);
+    consumed = send_key_event(ic, Key("n"));
     CHECK(consumed);  // composing again after reactivation
     frontend->call<ITestFrontend::keyEvent>(uuid, Key("Escape"), false);
 

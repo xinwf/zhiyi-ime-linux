@@ -16,15 +16,22 @@ concurrency:
 
 jobs:
   build:
-    # GitHub-hosted ubuntu-20.04 runners were retired in April 2025, so run
-    # both distro targets as containers on a still-supported Ubuntu runner.
-    runs-on: ubuntu-22.04
+    # Run each supported distro target as a container on a supported runner.
+    runs-on: ubuntu-24.04
     container:
       image: ubuntu:${{ matrix.ubuntu }}
     strategy:
       fail-fast: false
       matrix:
-        ubuntu: ['20.04', '22.04']
+        include:
+          - ubuntu: '20.04'
+            frontend: fcitx4
+          - ubuntu: '22.04'
+            frontend: fcitx5
+          - ubuntu: '24.04'
+            frontend: fcitx5
+          - ubuntu: '26.04'
+            frontend: fcitx5
     timeout-minutes: 30
     # Force unattended mode: no debconf/locale/timezone questions can stall
     # an unattended build.
@@ -67,16 +74,11 @@ jobs:
               fcitx5-modules-dev fcitx5
           fi
 
-      - name: Fetch Fcitx 4 SDK without installing it
-        if: matrix.ubuntu != '20.04'
-        env:
-          FETCH_FCITX5: '0'
-        run: bash scripts/fetch-sdk.sh
-
       - name: Build, test and package
         env:
           FETCH_SDK: '0'
           JOBS: '2'
+          ZHIYI_FRONTEND: ${{ matrix.frontend }}
         run: bash scripts/build-deb.sh
 
       - name: Upload DEB artifact
@@ -89,7 +91,7 @@ jobs:
   release:
     if: github.ref_type == 'tag'
     needs: build
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       GIT_TERMINAL_PROMPT: '0'
