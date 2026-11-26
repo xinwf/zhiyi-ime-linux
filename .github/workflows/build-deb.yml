@@ -15,11 +15,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deb:
+  build:
+    # GitHub-hosted ubuntu-20.04 runners were retired in April 2025, so run
+    # both distro targets as containers on a still-supported Ubuntu runner.
     runs-on: ubuntu-22.04
+    container:
+      image: ubuntu:${{ matrix.ubuntu }}
+    strategy:
+      fail-fast: false
+      matrix:
+        ubuntu: ['20.04', '22.04']
     timeout-minutes: 30
-    # Force unattended mode: no debconf/locale/timezone questions, no git
-    # credential or gh CLI prompts can stall a CI job.
+    # Force unattended mode: no debconf/locale/timezone questions can stall
+    # an unattended build.
     env:
       DEBIAN_FRONTEND: noninteractive
       DEBCONF_NONINTERACTIVE_SEEN: 'true'
@@ -27,21 +35,21 @@ jobs:
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
       TZ: Etc/UTC
-      GIT_TERMINAL_PROMPT: '0'
-      GH_PROMPT_DISABLED: '1'
     steps:
+      - name: Prepare apt universe and git
+        run: |
+          apt-get update -o Acquire::Retries=3
+          apt-get install -y --no-install-recommends \
+            software-properties-common ca-certificates git
+          add-apt-repository -y universe
+          apt-get update -o Acquire::Retries=3
+
       - name: Check out source
         uses: actions/checkout@v4
-        with:
-          # Release notes are built from commits between tags; shallow clones
-          # would hide the previous tag and older history.
-          fetch-depth: 0
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update -o Acquire::Retries=3
-          sudo env DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
-            apt-get install -y --no-install-recommends \
+          apt-get install -y --no-install-recommends \
             -o Dpkg::Options::=--force-confdef \
             -o Dpkg::Options::=--force-confold \
             build-essential cmake dpkg-dev pkg-config python3 \
@@ -50,22 +58,8 @@ jobs:
             libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
             fcitx5-modules-dev fcitx5
 
-      - name: Resolve version
-        id: version
-        env:
-          REF_NAME: ${{ github.ref_name }}
-          REF_TYPE: ${{ github.ref_type }}
-        run: |
-          if [ "$REF_TYPE" = "tag" ]; then
-            version="${REF_NAME#v}"
-          else
-            version="$(sed -n 's/^project(zhiyi-ime VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)"
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
       - name: Build, test and package
         env:
-          VERSION: ${{ steps.version.outputs.version }}
           FETCH_SDK: '0'
           JOBS: '2'
         run: bash scripts/build-deb.sh
@@ -73,17 +67,48 @@ jobs:
       - name: Upload DEB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: zhiyi-ime-deb-${{ steps.version.outputs.version }}
+          name: deb-ubuntu-${{ matrix.ubuntu }}
           path: dist/*.deb
           if-no-files-found: error
 
-      - name: Publish GitHub Release
-        if: github.ref_type == 'tag'
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      GIT_TERMINAL_PROMPT: '0'
+      GH_PROMPT_DISABLED: '1'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          # Release notes fall back to the commit range between tags.
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
         env:
-          GH_TOKEN: ${{ github.token }}
           REF_NAME: ${{ github.ref_name }}
+        run: echo "version=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download DEB artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb-ubuntu-*
+          path: artifacts
+
+      - name: Prepare release notes and assets
+        env:
           VERSION: ${{ steps.version.outputs.version }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
+          mkdir -p release-assets
+          for f in artifacts/*/*.deb; do
+            distro="$(basename "$(dirname "$f")")"
+            cp "$f" "release-assets/${distro}_$(basename "$f")"
+          done
+
           # Prefer the curated, human-readable summary from CHANGELOG.md.
           # GitHub's --generate-notes only lists merged PRs, which is empty
           # for direct pushes; a commit list is used only as a last resort.
@@ -117,9 +142,19 @@ jobs:
               echo "$compare"
             fi
             echo
-            echo "安装包：\`zhiyi-ime_${VERSION}_$(dpkg --print-architecture).deb\`"
+            echo "安装包（Release 附件）："
+            for f in release-assets/*.deb; do
+              echo "- \`$(basename "$f")\`"
+            done
           } > release-notes.md
-          gh release create "$REF_NAME" dist/*.deb \
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$REF_NAME" release-assets/*.deb \
             --title "知意输入法 Linux v${VERSION}" \
             --notes-file release-notes.md \
             --verify-tag

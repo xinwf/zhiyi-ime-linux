@@ -23,7 +23,8 @@
   与 Fcitx 5 classicui 主题。
 - **候选窗横排布局**：可用 `zhiyi-config --set layout horizontal` 或托盘菜单切换。
 - **Debian 打包与自动发布**：免 root 的 SDK 获取、`ctest` 回归测试、
-  `dpkg-deb` 打包，以及 GitHub Actions 自动构建、测试并发布 Release。
+  `dpkg-deb` 打包，以及 GitHub Actions 自动构建、测试并发布 Release；
+  同时产出 Ubuntu 20.04 与 22.04 两个安装包。
 
 ### 修复
 

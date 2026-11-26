@@ -121,11 +121,13 @@ cmake -S . -B build-fc5 -DZHIYI_ENABLE_FCITX4=OFF   # fcitx5 机器
 
 ## GitHub 自动打包与发布
 
-`.github/workflows/build-deb.yml` 在 Ubuntu 22.04 上运行：push 到 `main`、Pull
-Request 或手动触发时执行 configure → build → ctest → dpkg-deb，并把 `.deb`
-作为 Actions artifact 上传；推送 `v*` 标签时还会自动创建 GitHub Release，
-把 `.deb` 作为附件发布。CI 直接安装发行版开发包（`fcitx-libs-dev`、
-`libfcitx5core-dev` 等）构建双前端包，不下载 SDK。
+`.github/workflows/build-deb.yml` 在 Ubuntu 22.04 runner 上用容器矩阵同时构建
+**Ubuntu 20.04 与 22.04** 两个目标（GitHub 托管的 20.04 runner 已于 2025 年
+下线），push 到 `main`、Pull Request 或手动触发时执行 configure → build →
+ctest → dpkg-deb，并把两个 `.deb` 分别作为 Actions artifact 上传；推送 `v*`
+标签时还会自动创建 GitHub Release，把两个发行版的安装包都作为附件发布。
+CI 在容器里直接安装对应发行版开发包（`fcitx-libs-dev`、`libfcitx5core-dev`
+等）构建双前端包，不下载 SDK。
 
 发布新版本只需打标签（版本号取标签去掉前导 `v`；非标签构建取 CMakeLists.txt
 中的 `project(zhiyi-ime VERSION ...)`）：
