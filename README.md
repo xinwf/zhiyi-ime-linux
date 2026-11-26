@@ -91,7 +91,8 @@ data/                   —— 构建期从上游词库生成的二进制词典
 
 环境要求：CMake ≥ 3.15、C++17 编译器、Python 3、`dpkg-deb`，以及 fcitx4 或
 fcitx5 之一（开发头文件可由脚本免 root 下载解包到 `.deps/sysroot`，fcitx5 的
-distro 开发包已装时直接使用系统包）：
+distro 开发包已装时直接使用系统包）。Fcitx 5.1.19 及以上版本的头文件使用
+`std::span`，对应目标会自动切换到 C++20；Fcitx 4 和旧版 Fcitx 5 仍使用 C++17：
 
 ```bash
 bash scripts/fetch-sdk.sh     # 仅在首次构建时需要（下载 fcitx4/fcitx5 SDK）

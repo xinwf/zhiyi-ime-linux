@@ -172,6 +172,17 @@ public:
     void reset(const InputMethodEntry& entry,
                InputContextEvent& event) override;
 
+    // Fcitx 5.0.14 declares these inline, while later releases export them
+    // from libFcitx5Core. Overriding them keeps the addon loadable on both.
+    std::string subModeIconImpl(const InputMethodEntry&,
+                                InputContext&) override {
+        return {};
+    }
+    std::string subModeLabelImpl(const InputMethodEntry&,
+                                 InputContext&) override {
+        return {};
+    }
+
     void reloadConfig() override;
     void save() override { engine_.save(); }
 

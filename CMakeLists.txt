@@ -159,6 +159,10 @@ if(ZHIYI_ENABLE_FCITX5)
         ZHIYI_DATA_DIR="${CMAKE_INSTALL_FULL_DATADIR}/zhiyi/data"
     )
     target_link_libraries(zhiyi-addon-fcitx5 PRIVATE Fcitx5::Core zhiyi-core)
+    # Fcitx 5.1.19+ public headers use std::span and require C++20.
+    if(Fcitx5Core_VERSION VERSION_GREATER_EQUAL 5.1.19)
+        target_compile_features(zhiyi-addon-fcitx5 PRIVATE cxx_std_20)
+    endif()
     target_compile_options(zhiyi-addon-fcitx5 PRIVATE -Wall -Wextra
         -Wno-unused-parameter -fvisibility=hidden)
     add_dependencies(zhiyi-addon-fcitx5 zhiyi-dictionaries)
@@ -254,6 +258,9 @@ if(BUILD_TESTING)
         add_executable(zhiyi-fcitx5-test tools/zhiyi_fcitx5_test.cpp)
         target_link_libraries(zhiyi-fcitx5-test PRIVATE
             Fcitx5::Core Fcitx5::Module::TestFrontend)
+        if(Fcitx5Core_VERSION VERSION_GREATER_EQUAL 5.1.19)
+            target_compile_features(zhiyi-fcitx5-test PRIVATE cxx_std_20)
+        endif()
         target_include_directories(zhiyi-fcitx5-test PRIVATE
             "${CMAKE_SOURCE_DIR}/src")
         target_compile_definitions(zhiyi-fcitx5-test PRIVATE

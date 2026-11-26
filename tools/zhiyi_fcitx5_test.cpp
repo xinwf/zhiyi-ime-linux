@@ -186,12 +186,13 @@ static void run_tests_part1(Instance* instance, const ICUUID& uuid,
         out.close();
         CHECK(out.good());
         // Continue after the event loop had a chance to deliver inotify.
+        // Returning false ends this one-shot event. Do not destroy its handle
+        // from inside the callback: Fcitx 5.0.x still accesses it afterwards.
         next_phase_event = instance->eventLoop().addTimeEvent(
             CLOCK_MONOTONIC, now(CLOCK_MONOTONIC) + 500000, 0,
             [instance, uuid, ic, config_dir](EventSourceTime*, uint64_t) {
-                next_phase_event.reset();
                 run_tests_part2(instance, uuid, ic, config_dir);
-                return true;
+                return false;
             });
     }
 }
