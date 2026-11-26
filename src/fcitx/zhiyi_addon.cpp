@@ -3,8 +3,6 @@
 // Fcitx 4 input method front end. All pinyin logic lives in the
 // framework-independent zhiyi-core library; this file only translates
 // Fcitx key events / display primitives to and from that engine.
-#include <X11/keysym.h>
-
 #include <fcitx/candidate.h>
 #include <fcitx/fcitx.h>
 #include <fcitx/ime.h>
@@ -63,31 +61,31 @@ zhiyi::Key make_key(FcitxKeySym sym, unsigned int state, bool english) {
         return key;
     }
 
-    if (sym >= XK_a && sym <= XK_z) {
+    if (sym >= FcitxKey_a && sym <= FcitxKey_z) {
         key.kind = zhiyi::KeyKind::kChar;
-        key.ch = static_cast<char>('a' + (sym - XK_a));
-    } else if (sym >= XK_A && sym <= XK_Z) {
+        key.ch = static_cast<char>('a' + (sym - FcitxKey_a));
+    } else if (sym >= FcitxKey_A && sym <= FcitxKey_Z) {
         key.kind = zhiyi::KeyKind::kChar;
-        key.ch = static_cast<char>('A' + (sym - XK_A));
-    } else if (sym >= XK_0 && sym <= XK_9) {
+        key.ch = static_cast<char>('A' + (sym - FcitxKey_A));
+    } else if (sym >= FcitxKey_0 && sym <= FcitxKey_9) {
         key.kind = zhiyi::KeyKind::kDigit;
-        key.ch = static_cast<char>('0' + (sym - XK_0));
+        key.ch = static_cast<char>('0' + (sym - FcitxKey_0));
     } else {
         switch (sym) {
-            case XK_BackSpace: key.kind = zhiyi::KeyKind::kBackspace; break;
-            case XK_Return:
-            case XK_KP_Enter: key.kind = zhiyi::KeyKind::kReturn; break;
-            case XK_Escape: key.kind = zhiyi::KeyKind::kEscape; break;
-            case XK_space:
-            case XK_KP_Space: key.kind = zhiyi::KeyKind::kSpace; break;
-            case XK_Prior:
-            case XK_KP_Prior:
-            case XK_Up:
-            case XK_minus: key.kind = zhiyi::KeyKind::kPageUp; break;
-            case XK_Next:
-            case XK_KP_Next:
-            case XK_Down:
-            case XK_equal: key.kind = zhiyi::KeyKind::kPageDown; break;
+            case FcitxKey_BackSpace: key.kind = zhiyi::KeyKind::kBackspace; break;
+            case FcitxKey_Return:
+            case FcitxKey_KP_Enter: key.kind = zhiyi::KeyKind::kReturn; break;
+            case FcitxKey_Escape: key.kind = zhiyi::KeyKind::kEscape; break;
+            case FcitxKey_space:
+            case FcitxKey_KP_Space: key.kind = zhiyi::KeyKind::kSpace; break;
+            case FcitxKey_Prior:
+            case FcitxKey_KP_Prior:
+            case FcitxKey_Up:
+            case FcitxKey_minus: key.kind = zhiyi::KeyKind::kPageUp; break;
+            case FcitxKey_Next:
+            case FcitxKey_KP_Next:
+            case FcitxKey_Down:
+            case FcitxKey_equal: key.kind = zhiyi::KeyKind::kPageDown; break;
             default:
                 if (sym >= 0x20 && sym <= 0x7e) {
                     key.kind = zhiyi::KeyKind::kChar;
@@ -165,7 +163,7 @@ static void* ZhiyiCreate(FcitxInstance* instance) {
     };
     iface.DoInput = [](void* arg, FcitxKeySym sym, unsigned int state) -> INPUT_RETURN_VALUE {
         auto* addon = static_cast<ZhiyiAddon*>(arg);
-        if (sym == XK_Shift_L || sym == XK_Shift_R) {
+        if (sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) {
             addon->shift_down = true;
             addon->shift_used = false;
             return IRV_TO_PROCESS;
@@ -191,7 +189,7 @@ static void* ZhiyiCreate(FcitxInstance* instance) {
                               unsigned int state) -> INPUT_RETURN_VALUE {
         auto* addon = static_cast<ZhiyiAddon*>(arg);
         FCITX_UNUSED(state);
-        if ((sym == XK_Shift_L || sym == XK_Shift_R) && addon->shift_down &&
+        if ((sym == FcitxKey_Shift_L || sym == FcitxKey_Shift_R) && addon->shift_down &&
             !addon->shift_used) {
             addon->shift_down = false;
             const auto result = addon->engine.process(
