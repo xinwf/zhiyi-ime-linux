@@ -11,6 +11,10 @@
 # fast and fully under our control.
 set -euo pipefail
 
+# Keep every package operation unattended, including fetch-sdk.sh below.
+export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT/build/deb}"
 DIST_DIR="${DIST_DIR:-$ROOT/dist}"
@@ -21,7 +25,11 @@ chmod +x "$ROOT/packaging/postinst" "$ROOT/packaging/postrm" \
          "$ROOT/scripts/zhiyi-config" "$ROOT/scripts/zhiyi-tray" \
          "$ROOT/scripts/fetch-sdk.sh" "$ROOT/scripts/generate_fcitx5_themes.py"
 
-if [ ! -f "$ROOT/.deps/sysroot/usr/include/fcitx/ime.h" ]; then
+# CI installs the distro SDK packages system-wide, so nothing to download.
+# Offline/local builds keep using fetch-sdk.sh; set FETCH_SDK=0 to opt out.
+if [ ! -f "$ROOT/.deps/sysroot/usr/include/fcitx/ime.h" ] &&
+   [ ! -f /usr/include/fcitx/ime.h ] &&
+   [ "${FETCH_SDK:-1}" = "1" ]; then
     echo "Fcitx SDK missing, fetching development packages ..."
     http_proxy="${http_proxy:-http://127.0.0.1:20172}" \
     https_proxy="${https_proxy:-http://127.0.0.1:20172}" \
@@ -58,7 +66,8 @@ else
     FRAMEWORK_DEPS="fcitx-bin (>= 4.2.9), fcitx-modules"
 fi
 
-VERSION="$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' "$BUILD_DIR/CMakeCache.txt")"
+# VERSION can be supplied by CI from the git tag; default to the CMake project version.
+VERSION="${VERSION:-$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' "$BUILD_DIR/CMakeCache.txt")}"
 ARCH="$(dpkg --print-architecture)"
 SIZE="$(du -sk "$STAGE/usr" | cut -f1)"
 sed -e "s/@PROJECT_VERSION@/$VERSION/g" \

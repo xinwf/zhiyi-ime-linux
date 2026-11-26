@@ -119,6 +119,28 @@ cmake -S . -B build-fc4 -DZHIYI_ENABLE_FCITX5=OFF   # fcitx4 机器
 cmake -S . -B build-fc5 -DZHIYI_ENABLE_FCITX4=OFF   # fcitx5 机器
 ```
 
+## GitHub 自动打包与发布
+
+`.github/workflows/build-deb.yml` 在 Ubuntu 22.04 上运行：push 到 `main`、Pull
+Request 或手动触发时执行 configure → build → ctest → dpkg-deb，并把 `.deb`
+作为 Actions artifact 上传；推送 `v*` 标签时还会自动创建 GitHub Release，
+把 `.deb` 作为附件发布。CI 直接安装发行版开发包（`fcitx-libs-dev`、
+`libfcitx5core-dev` 等）构建双前端包，不下载 SDK。
+
+发布新版本只需打标签（版本号取标签去掉前导 `v`；非标签构建取 CMakeLists.txt
+中的 `project(zhiyi-ime VERSION ...)`）：
+
+```bash
+git tag v0.2.1
+git push origin v0.2.1
+```
+
+Release 页面的“更新内容”取自 `CHANGELOG.md` 中与标签版本对应的章节，是面向
+用户的版本摘要；打标签前请先补上该版本内容。若该章节缺失，工作流会退化为列出
+两个标签之间的提交记录。
+
+下载页面：https://github.com/xinwf/zhiyi-ime-linux/releases
+
 ## 安装与使用
 
 ```bash

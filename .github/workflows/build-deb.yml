@@ -1,0 +1,125 @@
+name: Build and publish DEB
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deb-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deb:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    # Force unattended mode: no debconf/locale/timezone questions, no git
+    # credential or gh CLI prompts can stall a CI job.
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      DEBCONF_NONINTERACTIVE_SEEN: 'true'
+      APT_LISTCHANGES_FRONTEND: none
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      TZ: Etc/UTC
+      GIT_TERMINAL_PROMPT: '0'
+      GH_PROMPT_DISABLED: '1'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          # Release notes are built from commits between tags; shallow clones
+          # would hide the previous tag and older history.
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -o Acquire::Retries=3
+          sudo env DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \
+            apt-get install -y --no-install-recommends \
+            -o Dpkg::Options::=--force-confdef \
+            -o Dpkg::Options::=--force-confold \
+            build-essential cmake dpkg-dev pkg-config python3 \
+            extra-cmake-modules \
+            fcitx-libs-dev \
+            libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
+            fcitx5-modules-dev fcitx5
+
+      - name: Resolve version
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            version="${REF_NAME#v}"
+          else
+            version="$(sed -n 's/^project(zhiyi-ime VERSION \([^ ]*\).*/\1/p' CMakeLists.txt)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build, test and package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          FETCH_SDK: '0'
+          JOBS: '2'
+        run: bash scripts/build-deb.sh
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zhiyi-ime-deb-${{ steps.version.outputs.version }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REF_NAME: ${{ github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Prefer the curated, human-readable summary from CHANGELOG.md.
+          # GitHub's --generate-notes only lists merged PRs, which is empty
+          # for direct pushes; a commit list is used only as a last resort.
+          summary="$(awk -v ver="$VERSION" '
+            /^## / { if (inside) exit; if (index($0, "[" ver "]")) { inside=1; next } }
+            inside { print }
+          ' CHANGELOG.md)"
+          prev_tag="$(git describe --tags --abbrev=0 "${REF_NAME}^" 2>/dev/null || true)"
+          if [ -n "$prev_tag" ]; then
+            range="${prev_tag}..${REF_NAME}"
+            compare="**完整变更**: https://github.com/${GITHUB_REPOSITORY}/compare/${prev_tag}...${REF_NAME}"
+          else
+            range="$REF_NAME"
+            compare=""
+          fi
+          {
+            echo "## 更新内容"
+            echo
+            if [ -n "$summary" ]; then
+              printf '%s\n' "$summary"
+            else
+              echo "> 本版本暂未编写摘要，以下为提交记录："
+              echo
+              echo "本次发布共 $(git rev-list --count --no-merges "$range") 项提交："
+              echo
+              git log --no-merges --pretty=format:'- %s (%h)' "$range"
+              echo
+            fi
+            echo
+            if [ -n "$compare" ]; then
+              echo "$compare"
+            fi
+            echo
+            echo "安装包：\`zhiyi-ime_${VERSION}_$(dpkg --print-architecture).deb\`"
+          } > release-notes.md
+          gh release create "$REF_NAME" dist/*.deb \
+            --title "知意输入法 Linux v${VERSION}" \
+            --notes-file release-notes.md \
+            --verify-tag
