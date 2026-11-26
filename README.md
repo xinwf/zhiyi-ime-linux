@@ -126,9 +126,10 @@ cmake -S . -B build-fc5 -DZHIYI_ENABLE_FCITX4=OFF   # fcitx5 机器
 下线），push 到 `main`、Pull Request 或手动触发时执行 configure → build →
 ctest → dpkg-deb，并把两个 `.deb` 分别作为 Actions artifact 上传；推送 `v*`
 标签时还会自动创建 GitHub Release，把两个发行版的安装包都作为附件发布。
-CI 在容器里安装 Fcitx 5 开发包，并通过 `scripts/fetch-sdk.sh` 下载、解包
-双框架 SDK 来构建双前端包。Fcitx 4 SDK 不通过 apt 安装，因为其依赖的
-`fcitx-bin` 与 `fcitx5` 互相冲突。
+CI 按发行版安装依赖：Ubuntu 20.04 只安装 Fcitx 4 开发包并构建单前端包；
+Ubuntu 22.04 安装 Fcitx 5 开发包，并通过 `scripts/fetch-sdk.sh` 只下载、解包
+Fcitx 4 SDK 来构建双前端包（设 `FETCH_FCITX5=0`）。Fcitx 4 SDK 不通过 apt
+安装到 22.04 容器，因为其依赖的 `fcitx-bin` 与 `fcitx5` 互相冲突。
 
 发布新版本只需打标签（版本号取标签去掉前导 `v`；非标签构建取 CMakeLists.txt
 中的 `project(zhiyi-ime VERSION ...)`）：

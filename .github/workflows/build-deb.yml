@@ -48,18 +48,29 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install build dependencies
+        env:
+          UBUNTU_VERSION: ${{ matrix.ubuntu }}
         run: |
-          # fcitx-libs-dev pulls in fcitx-bin, which conflicts with fcitx5.
-          # Download the Fcitx 4 SDK without installing it in the next step.
           apt-get install -y --no-install-recommends \
             -o Dpkg::Options::=--force-confdef \
             -o Dpkg::Options::=--force-confold \
             build-essential cmake dpkg-dev pkg-config python3 \
-            extra-cmake-modules \
-            libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
-            fcitx5-modules-dev fcitx5
+            extra-cmake-modules
 
-      - name: Fetch SDK packages without installing them
+          # Ubuntu 20.04 provides Fcitx 4 only. Newer releases provide Fcitx 5,
+          # whose packages conflict with fcitx-bin from fcitx-libs-dev.
+          if [ "$UBUNTU_VERSION" = "20.04" ]; then
+            apt-get install -y --no-install-recommends fcitx-libs-dev
+          else
+            apt-get install -y --no-install-recommends \
+              libfcitx5core-dev libfcitx5config-dev libfcitx5utils-dev \
+              fcitx5-modules-dev fcitx5
+          fi
+
+      - name: Fetch Fcitx 4 SDK without installing it
+        if: matrix.ubuntu != '20.04'
+        env:
+          FETCH_FCITX5: '0'
         run: bash scripts/fetch-sdk.sh
 
       - name: Build, test and package

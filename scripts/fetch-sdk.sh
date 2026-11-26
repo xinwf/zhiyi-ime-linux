@@ -4,7 +4,7 @@
 # The runtime libraries are already installed on a normal Ubuntu/Fcitx system;
 # only headers and unversioned .so link stubs are missing. apt-get download
 # works as an unprivileged user, so we unpack them into .deps/sysroot and point
-# CMake at that tree.
+# CMake at that tree. Set FETCH_FCITX5=0 when the distro SDK is already installed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,18 +20,25 @@ PACKAGES=(
     libfcitx-config4
     libfcitx-core0
     libfcitx-utils0
-    # Fcitx 5 SDK (used by the fcitx5 front end when the distro dev packages
-    # are not installed; harmless to fetch alongside fcitx4). The CMake
-    # package configs reference the versioned runtime libraries, so the
-    # runtime soname packages must be unpacked alongside the dev ones.
-    libfcitx5core-dev
-    libfcitx5utils-dev
-    libfcitx5config-dev
-    fcitx5-modules-dev
-    libfcitx5core7
-    libfcitx5utils2
-    libfcitx5config6
 )
+
+# Fcitx 5 is unavailable on Ubuntu 20.04. Fetch it only when requested and
+# available, or when the caller explicitly asks for it with FETCH_FCITX5=1.
+FETCH_FCITX5="${FETCH_FCITX5:-auto}"
+if [ "$FETCH_FCITX5" = "1" ] ||
+   { [ "$FETCH_FCITX5" = "auto" ] && apt-cache show libfcitx5core-dev >/dev/null 2>&1; }; then
+    PACKAGES+=(
+        # The CMake package configs reference the versioned runtime libraries,
+        # so the runtime soname packages must be unpacked alongside the dev ones.
+        libfcitx5core-dev
+        libfcitx5utils-dev
+        libfcitx5config-dev
+        fcitx5-modules-dev
+        libfcitx5core7
+        libfcitx5utils2
+        libfcitx5config6
+    )
+fi
 
 echo "Downloading Fcitx SDK packages into $DEBS ..."
 (cd "$DEBS" && apt-get download "${PACKAGES[@]}")
