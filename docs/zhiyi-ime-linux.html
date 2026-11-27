@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>知意输入法 Linux 版 v0.2.0 — B站推广动效展示</title>
+<style>
+  :root {
+    --bg-deep: #070b14;
+    --bg-card: rgba(17, 24, 39, 0.74);
+    --border-glass: rgba(148, 163, 184, 0.18);
+    --text-main: #f8fafc;
+    --text-sub: #94a3b8;
+    --green-brand: #84cc16;
+    --green-glow: #4ade80;
+    --cyan-accent: #38bdf8;
+    --orange-accent: #fb923c;
+    --font-sans: 'Noto Sans CJK SC', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    --font-mono: 'Noto Sans Mono CJK SC', 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #04060c;
+    font-family: var(--font-sans);
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+
+  #viewport {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #04060c;
+  }
+
+  #stage {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: radial-gradient(circle at 20% 20%, #0f1c2e 0%, #070b14 55%, #05080f 100%);
+    transform-origin: center center;
+    flex-shrink: 0;
+  }
+
+  /* Subtle tech grid */
+  .bg-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.045) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 85% 85% at 50% 50%, black 40%, transparent 100%);
+    pointer-events: none;
+  }
+
+  /* Ambient orbs */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform;
+  }
+  #orb1 { width: 1120px; height: 1120px; background: radial-gradient(circle, rgba(34,197,94,0.32) 0%, rgba(34,197,94,0.10) 42%, transparent 70%); top: -380px; left: -320px; }
+  #orb2 { width: 1020px; height: 1020px; background: radial-gradient(circle, rgba(14,165,233,0.30) 0%, rgba(14,165,233,0.09) 42%, transparent 70%); bottom: -360px; right: -280px; }
+  #orb3 { width: 820px; height: 820px; background: radial-gradient(circle, rgba(249,115,22,0.16) 0%, rgba(249,115,22,0.05) 42%, transparent 70%); top: 120px; left: 580px; }
+
+  /* Top subtle brand watermark & progress */
+  .top-hud {
+    position: absolute;
+    top: 34px;
+    left: 56px;
+    right: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 40;
+    pointer-events: none;
+  }
+  .hud-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    opacity: 0.9;
+  }
+  .hud-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #84cc16, #16a34a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 22px;
+    color: #052e16;
+    box-shadow: 0 4px 18px rgba(132, 204, 22, 0.35);
+  }
+  .hud-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #e2e8f0;
+  }
+  .hud-tag {
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(132, 204, 22, 0.14);
+    border: 1px solid rgba(132, 204, 22, 0.35);
+    color: #a3e635;
+    font-family: var(--font-mono);
+  }
+  .hud-step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .step-dot {
+    width: 34px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.22);
+    overflow: hidden;
+    position: relative;
+  }
+  .step-dot-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, #84cc16, #38bdf8);
+    border-radius: 999px;
+  }
+
+  /* Scenes container */
+  .scene {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 96px 110px 136px;
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  /* Bottom subtitle bar */
+  .subtitle-wrap {
+    position: absolute;
+    bottom: 42px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 45;
+    pointer-events: none;
+  }
+  .subtitle-box {
+    background: rgba(7, 11, 20, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    padding: 14px 36px;
+    border-radius: 16px;
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    color: #f8fafc;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+    max-width: 1480px;
+    text-align: center;
+  }
+  .subtitle-box .hl {
+    color: #a3e635;
+    font-weight: 800;
+  }
+
+  /* Bottom thin timeline bar */
+  .progress-line {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 5px;
+    width: 0%;
+    background: linear-gradient(90deg, #84cc16, #22d3ee, #fb923c);
+    z-index: 50;
+  }
+
+  /* ================= SCENE 1: HOOK ================= */
+  .s1-kicker {
+    font-size: 26px;
+    font-weight: 700;
+    color: #38bdf8;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .s1-title {
+    font-size: 86px;
+    font-weight: 900;
+    line-height: 1.18;
+    text-align: center;
+    letter-spacing: -1px;
+    margin-bottom: 54px;
+  }
+  .s1-title .grad {
+    background: linear-gradient(120deg, #f8fafc 20%, #a3e635 65%, #38bdf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .pain-grid {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .pain-pill {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px 34px;
+    border-radius: 20px;
+    background: rgba(239, 68, 68, 0.11);
+    border: 1.5px solid rgba(248, 113, 113, 0.35);
+    font-size: 28px;
+    font-weight: 700;
+    color: #fecaca;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  }
+  .pain-x {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: rgba(239, 68, 68, 0.25);
+    color: #f87171;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: 900;
+  }
+
+  /* ================= SCENE 2: HERO ================= */
+  .hero-emblem {
+    width: 148px;
+    height: 148px;
+    border-radius: 36px;
+    background: linear-gradient(145deg, #a3e635 0%, #22c55e 55%, #15803d 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 86px;
+    font-weight: 900;
+    color: #052e16;
+    box-shadow:
+      0 24px 70px rgba(34, 197, 94, 0.45),
+      inset 0 2px 6px rgba(255, 255, 255, 0.5);
+    margin-bottom: 34px;
+    position: relative;
+  }
+  .hero-title {
+    font-size: 92px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .hero-ver {
+    font-size: 30px;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    padding: 8px 20px;
+    border-radius: 14px;
+    background: rgba(132, 204, 22, 0.16);
+    border: 1.5px solid rgba(132, 204, 22, 0.5);
+    color: #bef264;
+  }
+  .hero-sub {
+    font-size: 36px;
+    font-weight: 500;
+    color: #cbd5e1;
+    margin-bottom: 52px;
+    letter-spacing: 2px;
+  }
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 380px);
+    gap: 28px;
+  }
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    border-radius: 24px;
+    padding: 28px 32px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  }
+  .stat-num {
+    font-size: 48px;
+    font-weight: 900;
+    background: linear-gradient(90deg, #a3e635, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .stat-label {
+    font-size: 23px;
+    color: #cbd5e1;
+    font-weight: 600;
+  }
+
+  /* ================= SCENE 3: LIVE TYPING DEMO ================= */
+  .s3-layout {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1.25fr 0.75fr;
+    gap: 54px;
+    align-items: center;
+  }
+  .editor-win {
+    background: #111827;
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
+  }
+  .win-bar {
+    height: 52px;
+    background: #1e293b;
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  }
+  .win-dots { display: flex; gap: 10px; }
+  .win-dot { width: 14px; height: 14px; border-radius: 50%; }
+  .win-title { font-size: 18px; color: #94a3b8; font-family: var(--font-mono); }
+  .win-body {
+    padding: 32px 42px 320px;
+    min-height: 550px;
+    position: relative;
+    font-size: 32px;
+    line-height: 1.6;
+    color: #e2e8f0;
+  }
+  .editor-line-dim {
+    color: #64748b;
+    font-size: 22px;
+    font-family: var(--font-mono);
+    margin-bottom: 16px;
+  }
+  .typed-area {
+    font-size: 38px;
+    font-weight: 700;
+    color: #f8fafc;
+    min-height: 62px;
+  }
+  .preedit-inline {
+    color: #a3e635;
+    border-bottom: 3px solid #a3e635;
+    padding-bottom: 2px;
+    font-family: var(--font-mono);
+    font-size: 32px;
+    margin-left: 4px;
+  }
+  .caret {
+    display: inline-block;
+    width: 3px;
+    height: 38px;
+    background: #38bdf8;
+    vertical-align: middle;
+    margin-left: 3px;
+  }
+
+  /* Authentic Zhiyi Qingjian Candidate Popup */
+  .ime-popup {
+    position: absolute;
+    left: 42px;
+    top: 170px;
+    border-radius: 16px;
+    padding: 14px 20px;
+    min-width: 460px;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, 0.45);
+    border: 2px solid;
+  }
+  .ime-preedit {
+    font-size: 22px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ime-cands {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .ime-cands.horiz {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 14px;
+    align-items: center;
+  }
+  .ime-cand {
+    font-size: 23px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .ime-num { font-family: var(--font-mono); font-size: 20px; opacity: 0.72; }
+
+  .feature-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .section-eyebrow {
+    font-size: 22px;
+    font-weight: 800;
+    color: #a3e635;
+    letter-spacing: 3px;
+    margin-bottom: 8px;
+  }
+  .section-h2 {
+    font-size: 56px;
+    font-weight: 900;
+    line-height: 1.18;
+    margin-bottom: 18px;
+  }
+  .feat-item {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 20px 24px;
+    border-radius: 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+  }
+  .feat-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: rgba(132, 204, 22, 0.15);
+    border: 1px solid rgba(132, 204, 22, 0.4);
+    color: #a3e635;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+  .feat-text-title { font-size: 24px; font-weight: 800; color: #f8fafc; margin-bottom: 4px; }
+  .feat-text-desc { font-size: 19px; color: #94a3b8; }
+
+  /* ================= SCENE 4: 5 THEMES + HORIZ/VERT ================= */
+  .s4-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .themes-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 320px);
+    gap: 24px;
+    margin-bottom: 44px;
+  }
+  .theme-card {
+    border-radius: 22px;
+    padding: 20px;
+    border: 2.5px solid transparent;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
+    position: relative;
+  }
+  .theme-name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .theme-title { font-size: 22px; font-weight: 800; }
+  .theme-dot { width: 14px; height: 14px; border-radius: 50%; }
+  .theme-py { font-family: var(--font-mono); font-size: 18px; font-weight: 700; margin-bottom: 10px; opacity: 0.85; }
+  .theme-list { display: flex; flex-direction: column; gap: 6px; }
+  .theme-row { padding: 6px 10px; border-radius: 8px; font-size: 20px; font-weight: 700; }
+
+  .layout-demo-bar {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glass);
+    padding: 22px 36px;
+    border-radius: 22px;
+  }
+  .layout-tag {
+    font-size: 22px;
+    font-weight: 800;
+    padding: 8px 20px;
+    border-radius: 12px;
+    background: rgba(56, 189, 248, 0.16);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #7dd3fc;
+  }
+  .horiz-preview {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    background: #eef5e2;
+    color: #22330f;
+    border: 2px solid #7ba83e;
+    border-radius: 14px;
+    padding: 12px 24px;
+    font-size: 24px;
+    font-weight: 700;
+  }
+  .horiz-hl {
+    background: #dbe6bd;
+    color: #e06a0a;
+    padding: 4px 12px;
+    border-radius: 8px;
+  }
+
+  /* ================= SCENE 5: TRAY & HOT RELOAD ================= */
+  .s5-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 0.9fr 1.1fr;
+    gap: 64px;
+    align-items: center;
+  }
+  .tray-mockup {
+    background: #1a2234;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 22px;
+    padding: 24px;
+    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55);
+  }
+  .tray-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+    padding: 10px 18px;
+    background: #0f172a;
+    border-radius: 14px;
+    margin-bottom: 18px;
+    font-size: 18px;
+    color: #94a3b8;
+  }
+  .tray-icon-badge {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    background: #7ba83e;
+    color: #ffffff;
+    font-weight: 900;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 0 4px rgba(123, 168, 62, 0.25);
+  }
+  .tray-menu {
+    background: #1e293b;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    border-radius: 16px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .tray-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 22px;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+  .tray-item.active {
+    background: rgba(132, 204, 22, 0.2);
+    color: #bef264;
+  }
+  .tray-check { color: #4ade80; font-weight: 900; }
+  .tray-arrow { color: #94a3b8; }
+
+  .hotreload-card {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1.5px solid rgba(52, 211, 153, 0.4);
+    border-radius: 20px;
+    padding: 24px 28px;
+    margin-top: 24px;
+  }
+  .hotreload-title { font-size: 26px; font-weight: 800; color: #6ee7b7; margin-bottom: 10px; }
+  .hotreload-cmd {
+    font-family: var(--font-mono);
+    font-size: 21px;
+    color: #e2e8f0;
+    background: rgba(15, 23, 42, 0.85);
+    padding: 14px 18px;
+    border-radius: 12px;
+    line-height: 1.6;
+  }
+
+  /* ================= SCENE 6: INSTALL & UBUNTU MATRIX ================= */
+  .term-box {
+    width: 1280px;
+    background: #0d1320;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+    margin-bottom: 42px;
+  }
+  .term-body {
+    padding: 36px 44px;
+    font-family: var(--font-mono);
+    font-size: 32px;
+    line-height: 1.8;
+    color: #e2e8f0;
+  }
+  .term-prompt { color: #4ade80; font-weight: 800; }
+  .term-comment { color: #64748b; }
+  .distro-row {
+    display: grid;
+    grid-template-columns: repeat(4, 300px);
+    gap: 24px;
+  }
+  .distro-card {
+    background: var(--bg-card);
+    border: 1.5px solid var(--border-glass);
+    border-radius: 20px;
+    padding: 24px;
+    text-align: center;
+  }
+  .distro-ver { font-size: 32px; font-weight: 900; color: #f8fafc; margin-bottom: 8px; }
+  .distro-fw {
+    display: inline-block;
+    font-size: 20px;
+    font-family: var(--font-mono);
+    font-weight: 800;
+    padding: 5px 16px;
+    border-radius: 999px;
+  }
+  .fw4 { background: rgba(251, 146, 60, 0.16); color: #fdba74; border: 1px solid rgba(251, 146, 60, 0.4); }
+  .fw5 { background: rgba(56, 189, 248, 0.16); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+  /* ================= SCENE 7: OUTRO CTA ================= */
+  .repo-card {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    padding: 26px 46px;
+    border-radius: 24px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 2px solid rgba(132, 204, 22, 0.45);
+    box-shadow: 0 24px 64px rgba(34, 197, 94, 0.2);
+    margin: 28px 0 42px;
+  }
+  .repo-url {
+    font-family: var(--font-mono);
+    font-size: 38px;
+    font-weight: 800;
+    color: #f8fafc;
+  }
+  .repo-lic {
+    font-size: 20px;
+    font-weight: 700;
+    color: #a3e635;
+    margin-top: 4px;
+  }
+  .sanlian-row {
+    display: flex;
+    gap: 28px;
+  }
+  .sanlian-pill {
+    padding: 18px 36px;
+    border-radius: 999px;
+    background: rgba(251, 114, 153, 0.15);
+    border: 1.5px solid rgba(251, 114, 153, 0.45);
+    color: #fbcfe8;
+    font-size: 28px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Interactive Player Controls (hidden in ?capture=1) */
+  #controls {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.88);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    backdrop-filter: blur(12px);
+    padding: 10px 18px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 100;
+    opacity: 0.25;
+    transition: opacity 0.2s;
+  }
+  #controls:hover { opacity: 1; }
+  body.capture-mode #controls { display: none !important; }
+  .ctrl-btn {
+    background: rgba(132, 204, 22, 0.2);
+    border: 1px solid rgba(132, 204, 22, 0.45);
+    color: #bef264;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--font-sans);
+  }
+  .ctrl-btn:hover { background: rgba(132, 204, 22, 0.35); }
+  #scrubber { width: 240px; accent-color: #84cc16; cursor: pointer; }
+  #timeDisplay { font-family: var(--font-mono); font-size: 13px; color: #cbd5e1; min-width: 92px; }
+</style>
+</head>
+<body>
+<div id="viewport">
+  <div id="stage">
+    <div class="bg-grid"></div>
+    <div class="orb" id="orb1"></div>
+    <div class="orb" id="orb2"></div>
+    <div class="orb" id="orb3"></div>
+
+    <!-- Top HUD -->
+    <div class="top-hud">
+      <div class="hud-brand">
+        <div class="hud-logo">知</div>
+        <div class="hud-title">知意输入法 · Linux 版</div>
+        <div class="hud-tag">v0.2.0 · GPL-3.0</div>
+      </div>
+      <div class="hud-step" id="stepDots">
+        <div class="step-dot"><div class="step-dot-fill" id="sd0"></div></div>
+        <div class="step-dot"><div class="step-dot-fill" id="sd1"></div></div>
+        <div class="step-dot"><div class="step-dot-fill" id="sd2"></div></div>
+        <div class="step-dot"><div class="step-dot-fill" id="sd3"></div></div>
+        <div class="step-dot"><div class="step-dot-fill" id="sd4"></div></div>
+        <div class="step-dot"><div class="step-dot-fill" id="sd5"></div></div>
+        <div class="step-dot"><div class="step-dot-fill" id="sd6"></div></div>
+      </div>
+    </div>
+
+    <!-- SCENE 1: HOOK (0.0 - 4.5s) -->
+    <section class="scene" id="scene1">
+      <div class="s1-kicker" id="s1Kicker">LINUX DESKTOP PAIN POINTS</div>
+      <h1 class="s1-title" id="s1Title">
+        在 Ubuntu / Linux 上打字<br />
+        <span class="grad">还在反复折腾输入法？</span>
+      </h1>
+      <div class="pain-grid">
+        <div class="pain-pill" id="p1"><span class="pain-x">✕</span>配置繁琐难上手</div>
+        <div class="pain-pill" id="p2"><span class="pain-x">✕</span>默认词库太小不好用</div>
+        <div class="pain-pill" id="p3"><span class="pain-x">✕</span>候选窗颜值一言难尽</div>
+        <div class="pain-pill" id="p4"><span class="pain-x">✕</span>Fcitx 4 / 5 版本割裂</div>
+      </div>
+    </section>
+
+    <!-- SCENE 2: HERO REVEAL (4.5 - 9.5s) -->
+    <section class="scene" id="scene2">
+      <div class="hero-emblem" id="s2Logo">知</div>
+      <div class="hero-title" id="s2Title">
+        知意输入法 · Linux 版 <span class="hero-ver">v0.2.0</span>
+      </div>
+      <div class="hero-sub" id="s2Sub">原生 C++ 核心引擎 · 开源免费 · 装完即用</div>
+      <div class="stat-row">
+        <div class="stat-card" id="st1">
+          <div class="stat-num">146万+</div>
+          <div class="stat-label">rime-ice 拼音词库 · mmap 极速索引</div>
+        </div>
+        <div class="stat-card" id="st2">
+          <div class="stat-num">Fcitx 4 & 5</div>
+          <div class="stat-label">同一套引擎双框架自动适配</div>
+        </div>
+        <div class="stat-card" id="st3">
+          <div class="stat-num">Ubuntu 全系</div>
+          <div class="stat-label">20.04 / 22.04 / 24.04 / 26.04 官方 .deb</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 3: LIVE TYPING DEMO (9.5 - 15.5s) -->
+    <section class="scene" id="scene3">
+      <div class="s3-layout">
+        <div class="editor-win" id="s3Editor">
+          <div class="win-bar">
+            <div class="win-dots">
+              <div class="win-dot" style="background:#ef4444"></div>
+              <div class="win-dot" style="background:#f59e0b"></div>
+              <div class="win-dot" style="background:#22c55e"></div>
+            </div>
+            <div class="win-title">ubuntu-notes.md — 知意输入法实时演示</div>
+            <div style="width:54px"></div>
+          </div>
+          <div class="win-body">
+            <div class="editor-line-dim"># Linux 中文输入体验实测</div>
+            <div class="typed-area">
+              <span id="committedText"></span><span id="inlinePreedit" class="preedit-inline"></span><span class="caret" id="caret"></span>
+            </div>
+
+            <!-- Authentic Zhiyi Qingjian Green Candidate Popup -->
+            <div class="ime-popup" id="imePopup" style="background:#eef5e2; border-color:#7ba83e; color:#22330f;">
+              <div class="ime-preedit">
+                <span id="popupPinyin">zhi'yi'shu'ru'fa</span>
+                <span style="font-size:17px; color:#7a8f60;">知意青简绿 · 竖排</span>
+              </div>
+              <div class="ime-cands" id="popupCands"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-stack">
+          <div>
+            <div class="section-eyebrow">CORE ENGINE · C++17 / C++20</div>
+            <h2 class="section-h2">输入丝滑跟手<br />越用越懂你</h2>
+          </div>
+          <div class="feat-item" id="f1">
+            <div class="feat-badge">拼</div>
+            <div>
+              <div class="feat-text-title">全拼 · 首字母简拼 · 逐音节组句</div>
+              <div class="feat-text-desc">支持整词精确匹配、前缀补全与部分选字</div>
+            </div>
+          </div>
+          <div class="feat-item" id="f2">
+            <div class="feat-badge">双</div>
+            <div>
+              <div class="feat-text-title">内置 5 种主流双拼 + 7 组模糊音</div>
+              <div class="feat-text-desc">小鹤 / 自然码 / 微软 / 搜狗 / 智能 ABC 原生支持</div>
+            </div>
+          </div>
+          <div class="feat-item" id="f3">
+            <div class="feat-badge">学</div>
+            <div>
+              <div class="feat-text-title">本地用户词频自学习</div>
+              <div class="feat-text-desc">数据存于 XDG 目录，卸载升级不丢个人词库</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 4: 5 QINGJIAN THEMES & HORIZONTAL/VERTICAL (15.5 - 21.0s) -->
+    <section class="scene" id="scene4">
+      <div class="s4-header">
+        <div class="section-eyebrow">QINGJIAN SKINS · DUAL FRAMEWORK</div>
+        <h2 class="section-h2" style="margin-bottom:10px;">5 套高颜值青简皮肤 · 横竖排随心切</h2>
+      </div>
+
+      <div class="themes-grid" id="themesGrid">
+        <!-- 1. Green -->
+        <div class="theme-card" id="tc0" style="background:#eef5e2; color:#22330f; border-color:#7ba83e;">
+          <div class="theme-name-row"><span class="theme-title">知意青简绿</span><span class="theme-dot" style="background:#7ba83e"></span></div>
+          <div class="theme-py">qing'jian</div>
+          <div class="theme-list">
+            <div class="theme-row" style="background:#dbe6bd; color:#e06a0a;">1. 青简绿</div>
+            <div class="theme-row">2. 清爽护眼</div>
+            <div class="theme-row">3. 默认主题</div>
+          </div>
+        </div>
+        <!-- 2. Light -->
+        <div class="theme-card" id="tc1" style="background:#ffffff; color:#282828; border-color:#d4d4d8;">
+          <div class="theme-name-row"><span class="theme-title">知意简白</span><span class="theme-dot" style="background:#94be52"></span></div>
+          <div class="theme-py">jian'bai</div>
+          <div class="theme-list">
+            <div class="theme-row" style="background:#e2e2e2; color:#ff8d28;">1. 简白浅色</div>
+            <div class="theme-row">2. 极简干净</div>
+            <div class="theme-row">3. 日间办公</div>
+          </div>
+        </div>
+        <!-- 3. Dark -->
+        <div class="theme-card" id="tc2" style="background:#1e1e1e; color:#ebebeb; border-color:#52525b;">
+          <div class="theme-name-row"><span class="theme-title">知意深黑</span><span class="theme-dot" style="background:#ff9230"></span></div>
+          <div class="theme-py">shen'hei</div>
+          <div class="theme-list">
+            <div class="theme-row" style="background:#3c3c3c; color:#ff9230;">1. 深黑护眼</div>
+            <div class="theme-row">2. 暗色桌面</div>
+            <div class="theme-row">3. 夜间写码</div>
+          </div>
+        </div>
+        <!-- 4. Orange -->
+        <div class="theme-card" id="tc3" style="background:#fff4e8; color:#4a2b10; border-color:#e27a2c;">
+          <div class="theme-name-row"><span class="theme-title">知意青简橙</span><span class="theme-dot" style="background:#f06010"></span></div>
+          <div class="theme-py">nuan'cheng</div>
+          <div class="theme-list">
+            <div class="theme-row" style="background:#f1d9b6; color:#f06010;">1. 暖橙配色</div>
+            <div class="theme-row">2. 温暖复古</div>
+            <div class="theme-row">3. 一眼辨识</div>
+          </div>
+        </div>
+        <!-- 5. Blue -->
+        <div class="theme-card" id="tc4" style="background:#eef5ff; color:#16324f; border-color:#2f6fed;">
+          <div class="theme-name-row"><span class="theme-title">知意青简蓝</span><span class="theme-dot" style="background:#1677ff"></span></div>
+          <div class="theme-py">qing'lan</div>
+          <div class="theme-list">
+            <div class="theme-row" style="background:#d0e2f5; color:#1677ff;">1. 晴蓝通透</div>
+            <div class="theme-row">2. 沉稳高效</div>
+            <div class="theme-row">3. 极客气质</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layout-demo-bar" id="s4LayoutBar">
+        <span class="layout-tag">支持横排候选窗</span>
+        <div class="horiz-preview">
+          <span style="font-family:var(--font-mono); opacity:0.75;">kai'yuan</span>
+          <span style="opacity:0.3;">|</span>
+          <span class="horiz-hl">1. 开源</span>
+          <span>2. 开源社区</span>
+          <span>3. 开元</span>
+          <span>4. 开园</span>
+          <span style="opacity:0.45;">▾</span>
+        </div>
+        <span style="font-size:21px; color:#94a3b8;">Fcitx 4 & Fcitx 5 同步提供</span>
+      </div>
+    </section>
+
+    <!-- SCENE 5: TRAY GUI & HOT RELOAD (21.0 - 25.5s) -->
+    <section class="scene" id="scene5">
+      <div class="s5-grid">
+        <div class="tray-mockup" id="s5Tray">
+          <div class="tray-topbar">
+            <span>Wi-Fi</span>
+            <span>音量</span>
+            <div class="tray-icon-badge">知</div>
+            <span>20:26</span>
+          </div>
+          <div class="tray-menu">
+            <div class="tray-item"><span>中 / 英切换</span><span class="tray-arrow">Shift</span></div>
+            <div class="tray-item"><span>候选词个数 (1..10)</span><span class="tray-arrow">▸</span></div>
+            <div class="tray-item" id="tmLayout"><span>候选窗布局 · 横排 / 竖排</span><span class="tray-arrow">▸</span></div>
+            <div class="tray-item" id="tmShuangpin"><span>双拼方案 · 小鹤 / 自然码 / 微软</span><span class="tray-arrow">▸</span></div>
+            <div class="tray-item"><span>模糊音 (7 组复选)</span><span class="tray-arrow">▸</span></div>
+            <div class="tray-item"><span>中文标点 / 简拼 / 组句</span><span class="tray-check">✓</span></div>
+            <div class="tray-item" id="tmSkin"><span>皮肤切换 · 5 套青简主题</span><span class="tray-arrow">▸</span></div>
+          </div>
+        </div>
+
+        <div id="s5Info">
+          <div class="section-eyebrow">ZHIYI-TRAY &amp; ZHIYI-CONFIG</div>
+          <h2 class="section-h2">图形托盘 + 命令行<br />改完立即热加载</h2>
+          <p style="font-size:26px; color:#cbd5e1; line-height:1.65;">
+            登录自启动 <code style="color:#a3e635; font-family:var(--font-mono);">zhiyi-tray</code>，仅在知意激活时出现「知」字图标；无论是点选托盘菜单还是终端调参，通过 D-Bus + inotify 实时生效，<strong style="color:#ffffff;">无需重启输入法</strong>。
+          </p>
+          <div class="hotreload-card">
+            <div class="hotreload-title">⚡ 极客命令行即时生效</div>
+            <div class="hotreload-cmd">
+              $ zhiyi-config --set shuangpin xiaohe<br />
+              $ zhiyi-config --set layout horizontal
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCENE 6: ONE-LINE INSTALL (25.5 - 29.5s) -->
+    <section class="scene" id="scene6">
+      <div style="text-align:center; margin-bottom:32px;">
+        <div class="section-eyebrow">ZERO HASSLE INSTALLATION</div>
+        <h2 class="section-h2" style="margin-bottom:0;">两行命令装完即用 · CI 自动构建全系 .deb</h2>
+      </div>
+
+      <div class="term-box" id="s6Term">
+        <div class="win-bar">
+          <div class="win-dots">
+            <div class="win-dot" style="background:#ef4444"></div>
+            <div class="win-dot" style="background:#f59e0b"></div>
+            <div class="win-dot" style="background:#22c55e"></div>
+          </div>
+          <div class="win-title">bash — 安装知意输入法 v0.2.0</div>
+          <div style="width:54px"></div>
+        </div>
+        <div class="term-body">
+          <div><span class="term-prompt">$ </span><span id="cmdLine1"></span></div>
+          <div><span class="term-prompt">$ </span><span id="cmdLine2"></span> <span class="term-comment" id="cmdComment"></span></div>
+        </div>
+      </div>
+
+      <div class="distro-row">
+        <div class="distro-card" id="d0"><div class="distro-ver">Ubuntu 20.04</div><div class="distro-fw fw4">Fcitx 4 .deb</div></div>
+        <div class="distro-card" id="d1"><div class="distro-ver">Ubuntu 22.04</div><div class="distro-fw fw5">Fcitx 5 .deb</div></div>
+        <div class="distro-card" id="d2"><div class="distro-ver">Ubuntu 24.04</div><div class="distro-fw fw5">Fcitx 5 .deb</div></div>
+        <div class="distro-card" id="d3"><div class="distro-ver">Ubuntu 26.04</div><div class="distro-fw fw5">Fcitx 5 .deb</div></div>
+      </div>
+    </section>
+
+    <!-- SCENE 7: OUTRO CTA (29.5 - 34.0s) -->
+    <section class="scene" id="scene7">
+      <div class="hero-emblem" id="s7Logo" style="width:120px; height:120px; font-size:68px; border-radius:28px; margin-bottom:24px;">知</div>
+      <h2 class="section-h2" style="font-size:74px; text-align:center; margin-bottom:10px;">知意输入法 · Linux 版</h2>
+      <div style="font-size:28px; color:#94a3b8;">开源免费 · 去 GitHub Releases 一键下载体验</div>
+
+      <div class="repo-card" id="s7Repo">
+        <div style="font-size:52px;">🐙</div>
+        <div>
+          <div class="repo-url">github.com/xinwf/zhiyi-ime-linux</div>
+          <div class="repo-lic">GPL-3.0 开源协议 · 欢迎提 Issue / PR / Star 支持</div>
+        </div>
+      </div>
+
+      <div class="sanlian-row" id="s7Sanlian">
+        <div class="sanlian-pill">👍 点赞支持</div>
+        <div class="sanlian-pill">🪙 投币鼓励</div>
+        <div class="sanlian-pill">⭐ 收藏备用</div>
+      </div>
+    </section>
+
+    <!-- Subtitle Overlay -->
+    <div class="subtitle-wrap">
+      <div class="subtitle-box" id="subtitleBox"></div>
+    </div>
+
+    <!-- Bottom Progress Bar -->
+    <div class="progress-line" id="progressLine"></div>
+  </div>
+</div>
+
+<!-- Interactive Controls (hidden during video render) -->
+<div id="controls">
+  <button class="ctrl-btn" id="btnPlay">暂停</button>
+  <button class="ctrl-btn" id="btnRestart">重播</button>
+  <input type="range" id="scrubber" min="0" max="34" step="0.02" value="0" />
+  <span id="timeDisplay">00.0s / 34.0s</span>
+</div>
+
+<script>
+(function () {
+  const DURATION = 34.0;
+  const isCapture = new URLSearchParams(window.location.search).get('capture') === '1';
+  if (isCapture) document.body.classList.add('capture-mode');
+
+  const stage = document.getElementById('stage');
+  function fitStage() {
+    if (isCapture) {
+      stage.style.transform = 'scale(1)';
+      return;
+    }
+    const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = `scale(${scale})`;
+  }
+  window.addEventListener('resize', fitStage);
+  fitStage();
+
+  // Easing helpers
+  const clamp01 = v => Math.max(0, Math.min(1, v));
+  const prog = (t, a, b) => clamp01((t - a) / (b - a));
+  const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
+  const easeOutBack = x => {
+    const c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+  };
+
+  function sceneAlpha(t, start, end, fadeIn = 0.45, fadeOut = 0.45) {
+    if (t < start || t > end) return 0;
+    const aIn = fadeIn > 0 ? clamp01((t - start) / fadeIn) : 1;
+    const aOut = fadeOut > 0 ? clamp01((end - t) / fadeOut) : 1;
+    return Math.min(aIn, aOut);
+  }
+
+  const scenes = [
+    { id: 'scene1', s: 0.0, e: 4.5 },
+    { id: 'scene2', s: 4.5, e: 9.5 },
+    { id: 'scene3', s: 9.5, e: 15.5 },
+    { id: 'scene4', s: 15.5, e: 21.0 },
+    { id: 'scene5', s: 21.0, e: 25.5 },
+    { id: 'scene6', s: 25.5, e: 29.5 },
+    { id: 'scene7', s: 29.5, e: 34.0 },
+  ];
+
+  const subtitles = [
+    { s: 0.0, e: 4.5, html: '在 Ubuntu 上写代码写文档，<span class="hl">终于不用再折腾输入法了</span>' },
+    { s: 4.5, e: 9.5, html: '全新开源 <span class="hl">知意输入法 Linux 版 v0.2.0</span>：146万词库 · Fcitx 4 &amp; 5 双框架原生支持' },
+    { s: 9.5, e: 15.5, html: '原生 C++ 引擎 + mmap 索引：<span class="hl">全拼、简拼、5种双拼、模糊音与词频自学习</span>一应俱全' },
+    { s: 15.5, e: 21.0, html: '内置 <span class="hl">5 套高颜值青简皮肤</span>，支持候选窗横竖排自由切换，颜值与手感双在线' },
+    { s: 21.0, e: 25.5, html: '自带 <span class="hl">zhiyi-tray 图形托盘</span> 与命令行工具，修改设置<span class="hl">实时热加载</span>，无需重启' },
+    { s: 25.5, e: 29.5, html: 'GitHub 自动打包 <span class="hl">Ubuntu 20.04 ~ 26.04</span> 四个 .deb，两行命令装完即用' },
+    { s: 29.5, e: 34.0, html: '完全开源免费！简介区获取 GitHub 下载地址，<span class="hl">一键三连支持开源项目</span>' },
+  ];
+
+  const el = id => document.getElementById(id);
+
+  function renderAt(t) {
+    t = Math.max(0, Math.min(DURATION, t));
+
+    // Ambient orbs drift smoothly with t
+    el('orb1').style.transform = `translate(${Math.sin(t * 0.4) * 55}px, ${Math.cos(t * 0.3) * 40}px)`;
+    el('orb2').style.transform = `translate(${Math.cos(t * 0.35) * 60}px, ${Math.sin(t * 0.45) * 45}px)`;
+    el('orb3').style.transform = `translate(${Math.sin(t * 0.5) * 70}px, ${Math.cos(t * 0.35) * 35}px)`;
+
+    // Progress line & step dots
+    el('progressLine').style.width = `${(t / DURATION) * 100}%`;
+    scenes.forEach((sc, i) => {
+      const fill = clamp01((t - sc.s) / (sc.e - sc.s));
+      el(`sd${i}`).style.width = `${fill * 100}%`;
+      const node = el(sc.id);
+      const a = sceneAlpha(t, sc.s, sc.e, i === 0 ? 0.35 : 0.45, i === 6 ? 0.0 : 0.4);
+      node.style.opacity = a.toFixed(4);
+      const enterY = (1 - easeOutCubic(prog(t, sc.s, sc.s + 0.55))) * 26;
+      node.style.transform = `translateY(${enterY.toFixed(2)}px)`;
+    });
+
+    // Subtitle
+    const sub = subtitles.find(x => t >= x.s && t <= x.e) || subtitles[subtitles.length - 1];
+    const subBox = el('subtitleBox');
+    if (subBox.innerHTML !== sub.html) subBox.innerHTML = sub.html;
+    const subA = sceneAlpha(t, sub.s, sub.e, 0.3, sub.e === DURATION ? 0 : 0.25);
+    subBox.style.opacity = subA.toFixed(4);
+
+    // ===== Scene 1 animations =====
+    if (t <= 4.7) {
+      ['p1', 'p2', 'p3', 'p4'].forEach((pid, idx) => {
+        const p = easeOutBack(prog(t, 0.8 + idx * 0.38, 1.45 + idx * 0.38));
+        el(pid).style.opacity = clamp01(p).toFixed(3);
+        el(pid).style.transform = `translateY(${(1 - p) * 28}px) scale(${0.92 + 0.08 * p})`;
+      });
+    }
+
+    // ===== Scene 2 animations =====
+    if (t >= 4.4 && t <= 9.7) {
+      const lp = easeOutBack(prog(t, 4.6, 5.4));
+      el('s2Logo').style.transform = `scale(${0.65 + 0.35 * lp})`;
+      el('s2Logo').style.opacity = clamp01(lp).toFixed(3);
+
+      ['st1', 'st2', 'st3'].forEach((sid, idx) => {
+        const p = easeOutCubic(prog(t, 5.7 + idx * 0.42, 6.45 + idx * 0.42));
+        el(sid).style.opacity = p.toFixed(3);
+        el(sid).style.transform = `translateY(${(1 - p) * 32}px)`;
+      });
+    }
+
+    // ===== Scene 3: Live Typing & Candidate Simulation =====
+    if (t >= 9.4 && t <= 15.7) {
+      const lt = t - 9.5; // 0 .. 6.0s
+      const blink = Math.floor(lt * 2.5) % 2 === 0 ? 1 : 0.15;
+      el('caret').style.opacity = blink;
+
+      const py1 = 'zhiyishurufa';
+      const py2 = 'lxky';
+      let committed = '';
+      let preedit = '';
+      let popupVisible = false;
+      let popupPy = '';
+      let cands = [];
+
+      if (lt < 2.2) {
+        // Typing zhiyishurufa
+        const n = Math.floor(prog(lt, 0.25, 1.85) * py1.length);
+        preedit = py1.slice(0, n);
+        if (n > 0) {
+          popupVisible = true;
+          popupPy = preedit.replace(/^zhi/, "zhi'").replace(/yi/, "yi'").replace(/shu/, "shu'").replace(/ru/, "ru'").replace(/'$/, '');
+          if (n <= 3) cands = ['知', '之', '只', '直', '至'];
+          else if (n <= 5) cands = ['知意', '旨意', '执意', '致意', '之意'];
+          else if (n <= 8) cands = ['知意输', '知意书', '知意数', '知意', '旨意'];
+          else cands = ['知意输入法', '知意输入', '知意', '旨意', '执意'];
+        }
+      } else if (lt < 3.0) {
+        // Committed "知意输入法，"
+        committed = '知意输入法，';
+        popupVisible = false;
+      } else if (lt < 4.9) {
+        // Typing 简拼 lxky -> Linux开源
+        committed = '知意输入法，';
+        const n = Math.floor(prog(lt, 3.1, 4.35) * py2.length);
+        preedit = py2.slice(0, n);
+        if (n > 0) {
+          popupVisible = true;
+          popupPy = preedit.split('').join("'");
+          if (n <= 2) cands = ['类型', '联系', '路线', '理想', '离线'];
+          else cands = ['Linux开源', '理想开源', '连线可用', '领先体验', '离线可用'];
+        }
+      } else {
+        committed = '知意输入法，Linux开源好用的中文输入法！';
+        popupVisible = false;
+      }
+
+      el('committedText').textContent = committed;
+      el('inlinePreedit').textContent = preedit;
+      el('inlinePreedit').style.display = preedit ? 'inline' : 'none';
+
+      const popup = el('imePopup');
+      popup.style.opacity = popupVisible ? '1' : '0';
+      popup.style.transform = popupVisible ? 'translateY(0px)' : 'translateY(10px)';
+      if (popupVisible) {
+        el('popupPinyin').textContent = popupPy;
+        el('popupCands').innerHTML = cands.map((c, idx) => {
+          const isFirst = idx === 0;
+          const style = isFirst
+            ? 'background:#dbe6bd; color:#e06a0a; font-weight:800;'
+            : 'color:#22330f;';
+          return `<div class="ime-cand" style="${style}"><span class="ime-num">${idx + 1}.</span>${c}</div>`;
+        }).join('');
+      }
+
+      ['f1', 'f2', 'f3'].forEach((fid, idx) => {
+        const p = easeOutCubic(prog(lt, 0.5 + idx * 0.55, 1.3 + idx * 0.55));
+        el(fid).style.opacity = p.toFixed(3);
+        el(fid).style.transform = `translateX(${(1 - p) * 40}px)`;
+      });
+    }
+
+    // ===== Scene 4: 5 Themes Spotlight =====
+    if (t >= 15.4 && t <= 21.2) {
+      const lt = t - 15.5; // 0 .. 5.5s
+      const activeIdx = Math.min(4, Math.floor(lt / 0.95));
+      for (let i = 0; i < 5; i++) {
+        const card = el(`tc${i}`);
+        const enter = easeOutBack(prog(lt, i * 0.16, 0.65 + i * 0.16));
+        const isSpot = i === activeIdx;
+        const lift = isSpot ? -14 : 0;
+        const scale = isSpot ? 1.05 : 0.98;
+        card.style.opacity = clamp01(enter).toFixed(3);
+        card.style.transform = `translateY(${((1 - enter) * 36 + lift).toFixed(1)}px) scale(${(0.9 + 0.1 * enter) * scale})`;
+        card.style.boxShadow = isSpot
+          ? '0 28px 64px rgba(132, 204, 22, 0.35)'
+          : '0 16px 36px rgba(0, 0, 0, 0.35)';
+      }
+      const barP = easeOutCubic(prog(lt, 1.2, 2.0));
+      el('s4LayoutBar').style.opacity = barP.toFixed(3);
+      el('s4LayoutBar').style.transform = `translateY(${(1 - barP) * 26}px)`;
+    }
+
+    // ===== Scene 5: Tray & Hot Reload =====
+    if (t >= 20.9 && t <= 25.7) {
+      const lt = t - 21.0; // 0 .. 4.5s
+      const step = Math.floor(lt / 1.1) % 3;
+      el('tmLayout').classList.toggle('active', step === 0);
+      el('tmShuangpin').classList.toggle('active', step === 1);
+      el('tmSkin').classList.toggle('active', step === 2);
+      const pL = easeOutCubic(prog(lt, 0.1, 0.85));
+      el('s5Tray').style.transform = `translateX(${(1 - pL) * -36}px)`;
+      el('s5Info').style.transform = `translateX(${(1 - pL) * 36}px)`;
+    }
+
+    // ===== Scene 6: One-Line Install =====
+    if (t >= 25.4 && t <= 29.7) {
+      const lt = t - 25.5; // 0 .. 4.0s
+      const c1 = 'sudo dpkg -i zhiyi-ime_0.2.0_amd64.deb';
+      const c2 = 'fcitx5 -r';
+      const cm = '# Ubuntu 20.04 使用 fcitx -r';
+      el('cmdLine1').textContent = c1.slice(0, Math.floor(prog(lt, 0.15, 1.5) * c1.length));
+      el('cmdLine2').textContent = c2.slice(0, Math.floor(prog(lt, 1.65, 2.2) * c2.length));
+      el('cmdComment').textContent = lt > 2.25 ? cm : '';
+
+      for (let i = 0; i < 4; i++) {
+        const dp = easeOutBack(prog(lt, 1.4 + i * 0.25, 2.05 + i * 0.25));
+        el(`d${i}`).style.opacity = clamp01(dp).toFixed(3);
+        el(`d${i}`).style.transform = `translateY(${(1 - dp) * 24}px)`;
+      }
+    }
+
+    // ===== Scene 7: Outro CTA =====
+    if (t >= 29.4) {
+      const lt = t - 29.5;
+      const rp = easeOutBack(prog(lt, 0.25, 1.0));
+      el('s7Repo').style.opacity = clamp01(rp).toFixed(3);
+      el('s7Repo').style.transform = `scale(${0.9 + 0.1 * rp})`;
+
+      const sp = easeOutCubic(prog(lt, 1.0, 1.8));
+      el('s7Sanlian').style.opacity = sp.toFixed(3);
+      el('s7Sanlian').style.transform = `translateY(${(1 - sp) * 24}px)`;
+    }
+  }
+
+  // Expose deterministic hook for headless Chromium frame capture
+  window.renderAt = renderAt;
+  window.VIDEO_DURATION = DURATION;
+
+  // Interactive playback loop when NOT in capture mode
+  let playing = !isCapture;
+  let curT = 0;
+  let lastTs = null;
+  const scrubber = el('scrubber');
+  const timeDisplay = el('timeDisplay');
+  const btnPlay = el('btnPlay');
+  const btnRestart = el('btnRestart');
+
+  function updateUI() {
+    scrubber.value = curT.toFixed(2);
+    timeDisplay.textContent = `${curT.toFixed(1).padStart(4, '0')}s / ${DURATION.toFixed(1)}s`;
+    btnPlay.textContent = playing ? '暂停' : '播放';
+  }
+
+  function tick(ts) {
+    if (lastTs === null) lastTs = ts;
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    if (playing) {
+      curT += dt;
+      if (curT >= DURATION) {
+        curT = 0;
+      }
+      renderAt(curT);
+      updateUI();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  if (!isCapture) {
+    btnPlay.addEventListener('click', () => {
+      playing = !playing;
+      lastTs = null;
+      updateUI();
+    });
+    btnRestart.addEventListener('click', () => {
+      curT = 0;
+      playing = true;
+      lastTs = null;
+      renderAt(0);
+      updateUI();
+    });
+    scrubber.addEventListener('input', e => {
+      curT = parseFloat(e.target.value);
+      renderAt(curT);
+      updateUI();
+    });
+    renderAt(0);
+    updateUI();
+    requestAnimationFrame(tick);
+  } else {
+    renderAt(0);
+  }
+})();
+</script>
+</body>
+</html>

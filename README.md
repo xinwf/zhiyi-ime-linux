@@ -4,6 +4,14 @@ Windows 版 [知意输入法](https://github.com/dd1000001000/zhiyi_ime) 的 Lin
 源码同时提供 **Fcitx 4 与 Fcitx 5 双输入法插件**；CI 按发行版生成对应的单前端
 `.deb`，可直接 `dpkg -i` 安装。
 
+## 效果演示
+
+[在线查看输入法效果](https://xinwf.github.io/zhiyi-ime-linux/) ·
+[演示页面源码](docs/zhiyi-ime-linux.html)
+
+演示页面是独立的静态 HTML，无需构建；每次推送到 `main` 分支时，
+GitHub Actions 会自动将 `docs/` 发布到 GitHub Pages。
+
 ## 双框架自动识别
 
 同一个源码树、同一个引擎（`src/core/`），为两个框架各提供一层薄适配：
